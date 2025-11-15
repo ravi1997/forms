@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, current_app, send_file
+from flask import render_template, request, jsonify, current_app, send_file, session
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.responses import bp
@@ -13,15 +13,30 @@ import pandas as pd
 response_schema = ResponseSchema()
 
 @bp.route('/<int:form_id>', methods=['GET'])
-@jwt_required()
 def list_responses(form_id):
     """List all responses for a form"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to access responses', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     form = Form.query.get_or_404(form_id)
-    
+
     # Check if user has permission to view responses
     if form.created_by != current_user_id and not User.query.get(current_user_id).can_view_analytics():
-        return jsonify({'error': 'forbidden', 'message': 'You do not have permission to view responses'}), 403
+        if request.is_json:
+            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to view responses'}), 403
+        else:
+            from flask import flash, redirect, url_for
+            flash('You do not have permission to view responses', 'error')
+            return redirect(url_for('main.dashboard'))
     
     # Get responses with pagination
     page = request.args.get('page', 1, type=int)
@@ -41,15 +56,30 @@ def list_responses(form_id):
     return render_template('responses/list.html', form=form, responses=responses)
 
 @bp.route('/<int:form_id>/export', methods=['GET'])
-@jwt_required()
 def export_responses(form_id):
     """Export form responses in specified format"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to export responses', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     form = Form.query.get_or_404(form_id)
-    
+
     # Check if user has permission to export responses
     if form.created_by != current_user_id and not User.query.get(current_user_id).can_view_analytics():
-        return jsonify({'error': 'forbidden', 'message': 'You do not have permission to export responses'}), 403
+        if request.is_json:
+            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to export responses'}), 403
+        else:
+            from flask import flash, redirect, url_for
+            flash('You do not have permission to export responses', 'error')
+            return redirect(url_for('main.dashboard'))
     
     # Get format from query parameter
     format_type = request.args.get('format', 'csv').lower()
@@ -183,15 +213,30 @@ def export_responses(form_id):
         return jsonify({'error': 'invalid_format', 'message': 'Invalid export format. Use csv, json, or excel'}), 400
 
 @bp.route('/<int:form_id>/analytics', methods=['GET'])
-@jwt_required()
 def form_analytics(form_id):
     """Display analytics for a form"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to access analytics', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     form = Form.query.get_or_404(form_id)
-    
+
     # Check if user has permission to view analytics
     if form.created_by != current_user_id and not User.query.get(current_user_id).can_view_analytics():
-        return jsonify({'error': 'forbidden', 'message': 'You do not have permission to view analytics'}), 403
+        if request.is_json:
+            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to view analytics'}), 403
+        else:
+            from flask import flash, redirect, url_for
+            flash('You do not have permission to view analytics', 'error')
+            return redirect(url_for('main.dashboard'))
     
     # Get response count
     response_count = Response.query.filter_by(form_id=form_id).count()
@@ -294,16 +339,31 @@ def form_analytics(form_id):
                           time_analytics=time_analytics)
 
 @bp.route('/<int:response_id>/details', methods=['GET'])
-@jwt_required()
 def response_details(response_id):
     """Show details of a specific response"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to access response details', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     response = Response.query.get_or_404(response_id)
-    
+
     # Check if user has permission to view this response
     form = response.form
     if form.created_by != current_user_id and not User.query.get(current_user_id).can_view_analytics():
-        return jsonify({'error': 'forbidden', 'message': 'You do not have permission to view this response'}), 403
+        if request.is_json:
+            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to view this response'}), 403
+        else:
+            from flask import flash, redirect, url_for
+            flash('You do not have permission to view this response', 'error')
+            return redirect(url_for('main.dashboard'))
     
     # Get all answers for this response
     answers = Answer.query.filter_by(response_id=response_id).all()
@@ -318,15 +378,30 @@ def response_details(response_id):
                           form=form)
 
 @bp.route('/<int:form_id>/filter', methods=['GET'])
-@jwt_required()
 def filter_responses(form_id):
     """Filter responses based on criteria"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to filter responses', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     form = Form.query.get_or_404(form_id)
-    
+
     # Check if user has permission to view responses
     if form.created_by != current_user_id and not User.query.get(current_user_id).can_view_analytics():
-        return jsonify({'error': 'forbidden', 'message': 'You do not have permission to view responses'}), 403
+        if request.is_json:
+            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to view responses'}), 403
+        else:
+            from flask import flash, redirect, url_for
+            flash('You do not have permission to view responses', 'error')
+            return redirect(url_for('main.dashboard'))
     
     # Get filter parameters
     start_date = request.args.get('start_date')

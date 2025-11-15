@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, current_app
+from flask import render_template, request, jsonify, current_app, session
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.analytics import bp
@@ -8,10 +8,20 @@ from sqlalchemy import func
 import json
 
 @bp.route('/', methods=['GET'])
-@jwt_required()
 def dashboard():
     """Main analytics dashboard"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to access analytics', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     user = User.query.get_or_404(current_user_id)
     
     # Get user's forms
@@ -67,15 +77,30 @@ def dashboard():
                           top_forms=top_forms)
 
 @bp.route('/form/<int:form_id>', methods=['GET'])
-@jwt_required()
 def form_analytics_page(form_id):
     """Detailed analytics for a specific form"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to access analytics', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     form = Form.query.get_or_404(form_id)
-    
+
     # Check if user has permission to view analytics
     if form.created_by != current_user_id and not User.query.get(current_user_id).can_view_analytics():
-        return jsonify({'error': 'forbidden', 'message': 'You do not have permission to view analytics'}), 403
+        if request.is_json:
+            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to view analytics'}), 403
+        else:
+            from flask import flash, redirect, url_for
+            flash('You do not have permission to view analytics', 'error')
+            return redirect(url_for('main.dashboard'))
     
     # Get response count
     response_count = Response.query.filter_by(form_id=form_id).count()
@@ -188,10 +213,20 @@ def form_analytics_page(form_id):
                           time_analytics=time_analytics)
 
 @bp.route('/user-engagement', methods=['GET'])
-@jwt_required()
 def user_engagement():
     """User engagement analytics"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to access analytics', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     user = User.query.get_or_404(current_user_id)
     
     # Get forms created by user

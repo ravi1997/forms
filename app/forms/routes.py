@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, current_app, redirect, url_for
+from flask import render_template, request, jsonify, current_app, redirect, url_for, session
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.forms import bp
@@ -162,15 +162,30 @@ def form_builder(form_id):
     return render_template('forms/builder.html', form=form, sections=sections, question_templates=question_templates)
 
 @bp.route('/<int:form_id>/update_structure', methods=['POST'])
-@jwt_required()
 def update_form_structure(form_id):
     """Update form structure (sections and questions)"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to update form structure', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     form = Form.query.get_or_404(form_id)
-    
+
     # Check if user has permission to edit this form
     if form.created_by != current_user_id:
-        return jsonify({'error': 'forbidden', 'message': 'You do not have permission to edit this form'}), 403
+        if request.is_json:
+            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to edit this form'}), 403
+        else:
+            from flask import flash, redirect, url_for
+            flash('You do not have permission to edit this form', 'error')
+            return redirect(url_for('main.dashboard'))
     
     # Get new structure from request
     structure = request.json.get('structure', [])
@@ -318,23 +333,41 @@ def create_from_template(template_id):
     return redirect(url_for('forms.form_builder', form_id=form.id))
 
 @bp.route('/question_library', methods=['GET'])
-@jwt_required()
 def question_library():
     """Display question library"""
-    current_user_id = get_jwt_identity()
-    
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to access question library', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     # Get all public questions and questions created by this user
     questions = QuestionLibrary.query.filter(
         (QuestionLibrary.is_public == True) | (QuestionLibrary.created_by == current_user_id)
     ).all()
-    
+
     return render_template('forms/question_library.html', questions=questions)
 
 @bp.route('/question_library', methods=['POST'])
-@jwt_required()
 def add_to_question_library():
     """Add a question to the library"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to add questions', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
     
     # Get data from request
     question_text = request.form.get('question_text')
