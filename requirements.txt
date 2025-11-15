@@ -21,3 +21,5 @@ pytest==7.4.2
 pytest-flask==1.2.0
 factory-boy==3.3.0
 pytest-cov==4.1.0
+pandas==2.0.3
+openpyxl==3.1.2

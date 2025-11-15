@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Dashboard - Dynamic Form Builder{% endblock %}
+
+{% block extra_css %}
+<style>
+.chart-container {
+    position: relative;
+    height: 400px;
+    margin-bottom: 30px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Analytics Dashboard</h1>
+</div>
+
+<!-- Stats Summary -->
+<div class="row">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Total Responses</h5>
+                <h2>{{ total_responses }}</h2>
+            </div>
+        </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Total Forms</h5>
+                <h2>{{ total_forms }}</h2>
+            </div>
+        </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Recent (7 days)</h5>
+                <h2>{{ recent_responses }}</h2>
+            </div>
+        </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Top Form</h5>
+                <h2>{{ top_forms[0].response_count if top_forms else 0 }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Responses Over Time Chart -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Responses Over Time</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="responsesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Forms -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Top Performing Forms</h5>
+            </div>
+            <div class="card-body">
+                {% if top_forms %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Form</th>
+                                <th>Responses</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in top_forms %}
+                            <tr>
+                                <td>{{ item.form.title }}</td>
+                                <td>{{ item.response_count }}</td>
+                                <td>
+                                    <a href="{{ url_for('analytics.form_analytics_page', form_id=item.form.id) }}" class="btn btn-sm btn-outline-primary">View Analytics</a>
+                                    <a href="{{ url_for('responses.list_responses', form_id=item.form.id) }}" class="btn btn-sm btn-outline-secondary">View Responses</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p>No forms with responses yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Chart data from backend
+const chartData = {{ chart_data | tojson }};
+
+// Prepare data for Chart.js
+const labels = chartData.map(item => item.date);
+const data = chartData.map(item => item.count);
+
+// Create the chart
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('responsesChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Responses per Day',
+                data: data,
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
