@@ -436,3 +436,55 @@ def filter_responses(form_id):
             response.user_info = User.query.get(response.user_id)
     
     return render_template('responses/list.html', form=form, responses=responses, filtered=True)
+
+@bp.route('/<int:response_id>/delete', methods=['DELETE'])
+def delete_response(response_id):
+    """Delete a specific response"""
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to delete responses', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
+    response = Response.query.get_or_404(response_id)
+    form = response.form
+
+    # Check if user has permission to delete this response
+    # Only form owner or admin can delete responses
+    user = User.query.get(current_user_id)
+    if form.created_by != current_user_id and not user.has_role(UserRoles.ADMIN):
+        if request.is_json:
+            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to delete this response'}), 403
+        else:
+            from flask import flash, redirect, url_for
+            flash('You do not have permission to delete this response', 'error')
+            return redirect(url_for('responses.list_responses', form_id=form.id))
+
+    try:
+        # Delete associated answers first
+        Answer.query.filter_by(response_id=response_id).delete()
+        # Delete the response
+        db.session.delete(response)
+        db.session.commit()
+
+        if request.is_json:
+            return jsonify({'message': 'Response deleted successfully'}), 200
+        else:
+            from flask import flash, redirect, url_for
+            flash('Response deleted successfully', 'success')
+            return redirect(url_for('responses.list_responses', form_id=form.id))
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting response: {str(e)}")
+        if request.is_json:
+            return jsonify({'error': 'delete_failed', 'message': 'Failed to delete response'}), 500
+        else:
+            from flask import flash, redirect, url_for
+            flash('Failed to delete response', 'error')
+            return redirect(url_for('responses.list_responses', form_id=form.id))

@@ -226,3 +226,152 @@ def refresh():
     current_user_id = get_jwt_identity()
     new_token = create_access_token(identity=current_user_id)
     return jsonify({'access_token': new_token}), 200
+
+@bp.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    """Handle forgot password requests"""
+    if request.method == 'GET':
+        return render_template('auth/forgot_password.html')
+
+    try:
+        # Determine input type
+        if request.is_json:
+            data = request.json
+        else:
+            data = request.form.to_dict()
+
+        email = data.get('email')
+        if not email:
+            if request.is_json:
+                return jsonify({'error': 'validation_error', 'message': 'Email is required'}), 400
+            else:
+                from flask import flash, redirect, url_for
+                flash('Email is required', 'error')
+                return redirect(url_for('auth.forgot_password'))
+
+        # Find user by email
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            # Don't reveal if email exists or not for security
+            if request.is_json:
+                return jsonify({'message': 'If the email exists, a password reset link has been sent'}), 200
+            else:
+                from flask import flash, redirect, url_for
+                flash('If the email exists, a password reset link has been sent', 'info')
+                return redirect(url_for('auth.login'))
+
+        # Generate reset token
+        reset_token = user.generate_reset_token()
+        db.session.commit()
+
+        # Send reset email
+        from flask_mail import Message
+        from app import mail
+        from flask import current_app
+
+        reset_url = url_for('auth.reset_password', token=reset_token, _external=True)
+        msg = Message('Password Reset Request',
+                     sender=current_app.config['MAIL_DEFAULT_SENDER'],
+                     recipients=[user.email])
+        msg.body = f'''Hi {user.username},
+
+You requested a password reset for your account.
+
+Please click the following link to reset your password:
+{reset_url}
+
+This link will expire in 1 hour.
+
+If you didn't request this reset, please ignore this email.
+
+Best regards,
+The Form Builder Team
+'''
+        mail.send(msg)
+
+        if request.is_json:
+            return jsonify({'message': 'Password reset link sent to your email'}), 200
+        else:
+            from flask import flash, redirect, url_for
+            flash('Password reset link sent to your email', 'success')
+            return redirect(url_for('auth.login'))
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Forgot password error: {str(e)}")
+        return jsonify({'error': 'forgot_password_failed', 'message': 'Failed to process request'}), 500
+
+@bp.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    """Handle password reset"""
+    if request.method == 'GET':
+        # Verify token is valid
+        user = User.query.filter_by(password_reset_token=token).first()
+        if not user or not user.verify_reset_token(token):
+            from flask import flash, redirect, url_for
+            flash('Invalid or expired reset token', 'error')
+            return redirect(url_for('auth.login'))
+        return render_template('auth/reset_password.html', token=token)
+
+    try:
+        # Determine input type
+        if request.is_json:
+            data = request.json
+        else:
+            data = request.form.to_dict()
+
+        password = data.get('password')
+        confirm_password = data.get('confirm_password')
+        token = data.get('token') or request.form.get('token')
+
+        if not password or not confirm_password:
+            if request.is_json:
+                return jsonify({'error': 'validation_error', 'message': 'Password and confirmation are required'}), 400
+            else:
+                from flask import flash, redirect, url_for
+                flash('Password and confirmation are required', 'error')
+                return redirect(url_for('auth.reset_password', token=token))
+
+        if password != confirm_password:
+            if request.is_json:
+                return jsonify({'error': 'validation_error', 'message': 'Passwords do not match'}), 400
+            else:
+                from flask import flash, redirect, url_for
+                flash('Passwords do not match', 'error')
+                return redirect(url_for('auth.reset_password', token=token))
+
+        if len(password) < 8:
+            if request.is_json:
+                return jsonify({'error': 'validation_error', 'message': 'Password must be at least 8 characters'}), 400
+            else:
+                from flask import flash, redirect, url_for
+                flash('Password must be at least 8 characters', 'error')
+                return redirect(url_for('auth.reset_password', token=token))
+
+        # Find user by token
+        user = User.query.filter_by(password_reset_token=token).first()
+        if not user or not user.verify_reset_token(token):
+            if request.is_json:
+                return jsonify({'error': 'invalid_token', 'message': 'Invalid or expired reset token'}), 400
+            else:
+                from flask import flash, redirect, url_for
+                flash('Invalid or expired reset token', 'error')
+                return redirect(url_for('auth.login'))
+
+        # Update password and clear reset token
+        user.set_password(password)
+        user.clear_reset_token()
+        user.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        if request.is_json:
+            return jsonify({'message': 'Password reset successfully'}), 200
+        else:
+            from flask import flash, redirect, url_for
+            flash('Password reset successfully! Please login with your new password.', 'success')
+            return redirect(url_for('auth.login'))
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Reset password error: {str(e)}")
+        return jsonify({'error': 'reset_failed', 'message': 'Failed to reset password'}), 500

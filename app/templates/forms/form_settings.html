@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Form Settings{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-8">
+  <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="bg-white shadow-lg rounded-lg">
+      <div class="px-6 py-8">
+        <div class="mb-8">
+          <h1 class="text-3xl font-bold text-gray-900">Form Settings</h1>
+          <p class="mt-2 text-gray-600">Configure advanced settings for "{{ form.title }}"</p>
+        </div>
+
+        <form action="{{ url_for('forms.form_settings', form_id=form.id) }}" method="POST" class="space-y-6">
+          <div>
+            <label for="expires_at" class="block text-sm font-medium text-gray-700">
+              Form Expiration
+            </label>
+            <input type="datetime-local" id="expires_at" name="expires_at"
+                   value="{% if form.settings and form.settings.get('expires_at') %}{{ form.settings.expires_at[:16] }}{% endif %}"
+                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            <p class="mt-1 text-sm text-gray-500">Leave empty for no expiration</p>
+          </div>
+
+          <div>
+            <label for="response_limit" class="block text-sm font-medium text-gray-700">
+              Response Limit
+            </label>
+            <input type="number" id="response_limit" name="response_limit" min="1"
+                   value="{% if form.settings %}{{ form.settings.get('response_limit', '') }}{% endif %}"
+                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                   placeholder="Unlimited">
+            <p class="mt-1 text-sm text-gray-500">Maximum number of responses (leave empty for unlimited)</p>
+          </div>
+
+          <div class="space-y-4">
+            <div class="flex items-start">
+              <div class="flex items-center h-5">
+                <input id="require_login" name="require_login" type="checkbox"
+                       {% if form.settings and form.settings.get('require_login') %}checked{% endif %}
+                       class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
+              </div>
+              <div class="ml-3 text-sm">
+                <label for="require_login" class="font-medium text-gray-700">Require Login</label>
+                <p class="text-gray-500">Users must be logged in to submit responses</p>
+              </div>
+            </div>
+
+            <div class="flex items-start">
+              <div class="flex items-center h-5">
+                <input id="collect_ip" name="collect_ip" type="checkbox"
+                       {% if form.settings and form.settings.get('collect_ip') %}checked{% endif %}
+                       class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
+              </div>
+              <div class="ml-3 text-sm">
+                <label for="collect_ip" class="font-medium text-gray-700">Collect IP Addresses</label>
+                <p class="text-gray-500">Store respondent IP addresses for security and analytics</p>
+              </div>
+            </div>
+
+            <div class="flex items-start">
+              <div class="flex items-center h-5">
+                <input id="allow_multiple_responses" name="allow_multiple_responses" type="checkbox"
+                       {% if form.settings and form.settings.get('allow_multiple_responses') %}checked{% endif %}
+                       class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
+              </div>
+              <div class="ml-3 text-sm">
+                <label for="allow_multiple_responses" class="font-medium text-gray-700">Allow Multiple Responses</label>
+                <p class="text-gray-500">Allow users to submit multiple responses (if login required)</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-4">
+            <a href="{{ url_for('forms.edit_form', form_id=form.id) }}"
+               class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+              Back to Edit
+            </a>
+
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+              Save Settings
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

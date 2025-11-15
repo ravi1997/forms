@@ -35,6 +35,10 @@ class User(UserMixin, db.Model):
     last_name = db.Column(db.String(50))
     avatar = db.Column(db.String(255))  # URL to avatar image
     preferences = db.Column(db.JSON)  # User preferences as JSON
+
+    # Password reset fields
+    password_reset_token = db.Column(db.String(100), unique=True)
+    password_reset_expires = db.Column(db.DateTime)
     
     # Relationships
     created_forms = db.relationship('Form', backref='creator', lazy=True, foreign_keys='Form.created_by')
@@ -56,7 +60,27 @@ class User(UserMixin, db.Model):
     
     def can_view_analytics(self):
         return self.role in [UserRoles.ADMIN, UserRoles.CREATOR, UserRoles.ANALYST]
-    
+
+    def generate_reset_token(self):
+        """Generate a password reset token"""
+        import secrets
+        from datetime import datetime, timedelta
+        self.password_reset_token = secrets.token_urlsafe(32)
+        self.password_reset_expires = datetime.utcnow() + timedelta(hours=1)  # Token expires in 1 hour
+        return self.password_reset_token
+
+    def verify_reset_token(self, token):
+        """Verify if the reset token is valid"""
+        from datetime import datetime
+        if self.password_reset_token == token and self.password_reset_expires > datetime.utcnow():
+            return True
+        return False
+
+    def clear_reset_token(self):
+        """Clear the reset token after use"""
+        self.password_reset_token = None
+        self.password_reset_expires = None
+
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
