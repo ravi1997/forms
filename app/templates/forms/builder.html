@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Form Builder - {{ form.title }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">{{ form.title }}</h1>
+                    {% if form.description %}
+                    <p class="mt-2 text-gray-600">{{ form.description }}</p>
+                    {% endif %}
+                </div>
+                <div class="flex space-x-3">
+                    <button id="saveForm" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition duration-150 ease-in-out">
+                        <i class="fas fa-save mr-2"></i>
+                        Save
+                    </button>
+                    <button id="previewForm" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                        <i class="fas fa-eye mr-2"></i>
+                        Preview
+                    </button>
+                    <a href="{{ url_for('forms.list_templates') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        Back
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <!-- Form Builder Panel -->
+            <div class="lg:col-span-3">
+                <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                    <div class="px-6 py-4 bg-gray-50 border-b">
+                        <h2 class="text-lg font-medium text-gray-900">Form Builder</h2>
+                    </div>
+                    <div class="p-6">
+                        <!-- Form Settings -->
+                        <div class="mb-6">
+                            <h3 class="text-md font-medium text-gray-900 mb-4">Form Settings</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="formTitle" class="block text-sm font-medium text-gray-700">Title</label>
+                                    <input type="text" id="formTitle" value="{{ form.title }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label for="formDescription" class="block text-sm font-medium text-gray-700">Description</label>
+                                    <textarea id="formDescription" rows="3" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">{{ form.description or '' }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sections Container -->
+                        <div id="sectionsContainer" class="space-y-6">
+                            <!-- Sections will be dynamically added here -->
+                        </div>
+
+                        <!-- Add Section Button -->
+                        <div class="mt-6">
+                            <button id="addSection" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition duration-150 ease-in-out">
+                                <i class="fas fa-plus mr-2"></i>
+                                Add Section
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="lg:col-span-1">
+                <!-- Question Library -->
+                <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-6">
+                    <div class="px-6 py-4 bg-gray-50 border-b">
+                        <h3 class="text-lg font-medium text-gray-900">Question Library</h3>
+                    </div>
+                    <div class="p-4 max-h-96 overflow-y-auto">
+                        {% for question in question_templates %}
+                        <div class="question-template p-3 border border-gray-200 rounded-md mb-2 cursor-pointer hover:bg-gray-50 transition duration-150 ease-in-out"
+                             data-type="{{ question.question_type }}"
+                             data-text="{{ question.question_text }}"
+                             data-required="{{ question.is_required }}">
+                            <div class="font-medium text-sm text-gray-900">{{ question.question_text }}</div>
+                            <div class="text-xs text-gray-500 mt-1">{{ question.question_type|replace('_', ' ')|title }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                    <div class="px-6 py-4 bg-gray-50 border-b">
+                        <h3 class="text-lg font-medium text-gray-900">Actions</h3>
+                    </div>
+                    <div class="p-4 space-y-3">
+                        <button id="publishForm" class="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition duration-150 ease-in-out">
+                            <i class="fas fa-globe mr-2"></i>
+                            Publish Form
+                        </button>
+                        <button id="unpublishForm" class="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                            <i class="fas fa-eye-slash mr-2"></i>
+                            Unpublish
+                        </button>
+                        <a href="{{ url_for('responses.list_responses', form_id=form.id) }}" class="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                            <i class="fas fa-chart-bar mr-2"></i>
+                            View Responses
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section Template (Hidden) -->
+<template id="sectionTemplate">
+    <div class="section bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-4">
+            <input type="text" class="section-title flex-1 text-lg font-medium bg-transparent border-none focus:outline-none focus:ring-0" placeholder="Section Title">
+            <button class="delete-section text-red-600 hover:text-red-800 ml-2">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+        <textarea class="section-description w-full p-2 border border-gray-300 rounded-md mb-4" placeholder="Section description (optional)"></textarea>
+
+        <div class="questions-container space-y-3">
+            <!-- Questions will be added here -->
+        </div>
+
+        <button class="add-question mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition duration-150 ease-in-out">
+            <i class="fas fa-plus mr-2"></i>
+            Add Question
+        </button>
+    </div>
+</template>
+
+<!-- Question Template (Hidden) -->
+<template id="questionTemplate">
+    <div class="question bg-white border border-gray-200 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center space-x-2">
+                <span class="question-type text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Text</span>
+                <label class="flex items-center">
+                    <input type="checkbox" class="required-checkbox mr-1">
+                    <span class="text-sm text-gray-600">Required</span>
+                </label>
+            </div>
+            <button class="delete-question text-red-600 hover:text-red-800">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+
+        <input type="text" class="question-text w-full p-2 border border-gray-300 rounded-md mb-3 font-medium" placeholder="Enter your question">
+
+        <div class="question-options">
+            <!-- Options will be added here for multiple choice, checkbox, etc. -->
+        </div>
+    </div>
+</template>
+
+<script>
+// Form builder JavaScript will go here
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize form builder
+    console.log('Form builder initialized');
+});
+</script>
+{% endblock %}

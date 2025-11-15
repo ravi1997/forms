@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - {{ form.title }}{% endblock %}
+
+{% block content %}
+<div class="py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">{{ form.title }} - Analytics</h1>
+                    <p class="mt-2 text-gray-600">{{ response_count }} total responses</p>
+                </div>
+                <a href="{{ url_for('responses.list_responses', form_id=form.id) }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                    <i class="fas fa-list mr-2"></i>
+                    View Responses
+                </a>
+            </div>
+        </div>
+
+        <!-- Analytics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                            <i class="fas fa-chart-bar text-white"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <dt class="text-sm font-medium text-gray-500 truncate">Total Responses</dt>
+                        <dd class="text-2xl font-semibold text-gray-900">{{ response_count }}</dd>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                            <i class="fas fa-calendar-alt text-white"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <dt class="text-sm font-medium text-gray-500 truncate">Completion Rate</dt>
+                        <dd class="text-2xl font-semibold text-gray-900">100%</dd>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                            <i class="fas fa-clock text-white"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <dt class="text-sm font-medium text-gray-500 truncate">Avg. Completion Time</dt>
+                        <dd class="text-2xl font-semibold text-gray-900">2m 30s</dd>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Response Timeline Chart -->
+        <div class="bg-white rounded-lg shadow-lg mb-8">
+            <div class="px-6 py-4 border-b">
+                <h2 class="text-lg font-medium text-gray-900">Response Timeline</h2>
+            </div>
+            <div class="p-6">
+                <canvas id="timelineChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Question Analytics -->
+        <div class="space-y-6">
+            <h2 class="text-2xl font-bold text-gray-900">Question Analytics</h2>
+
+            {% for question in analytics_data %}
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                <div class="px-6 py-4 border-b">
+                    <h3 class="text-lg font-medium text-gray-900">{{ question.question_text }}</h3>
+                    <p class="text-sm text-gray-500">{{ question.total_responses }} responses</p>
+                </div>
+                <div class="p-6">
+                    {% if question.question_type in ['multiple_choice', 'checkbox', 'dropdown'] %}
+                        <!-- Bar Chart for Choice Questions -->
+                        <canvas id="chart-{{ question.question_id }}" width="400" height="200"></canvas>
+                        <div class="mt-4 space-y-2">
+                            {% for option, count in question.answers.items() %}
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">{{ option }}</span>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-32 bg-gray-200 rounded-full h-2">
+                                        <div class="bg-blue-600 h-2 rounded-full" style="width: {{ (count / question.total_responses * 100) if question.total_responses > 0 else 0 }}%"></div>
+                                    </div>
+                                    <span class="text-sm text-gray-600 w-8 text-right">{{ count }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% elif question.question_type == 'rating' %}
+                        <!-- Rating Distribution -->
+                        <div class="grid grid-cols-5 gap-4">
+                            {% for rating in range(1, 6) %}
+                            <div class="text-center">
+                                <div class="text-2xl font-bold text-gray-900">{{ question.answers.get(rating|string, 0) }}</div>
+                                <div class="text-sm text-gray-500">{{ rating }} star{{ 's' if rating > 1 else '' }}</div>
+                                <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                                    <div class="bg-yellow-400 h-2 rounded-full" style="width: {{ (question.answers.get(rating|string, 0) / question.total_responses * 100) if question.total_responses > 0 else 0 }}%"></div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if question.get('average_rating') %}
+                        <div class="mt-4 text-center">
+                            <span class="text-lg font-medium text-gray-900">Average Rating: {{ "%.1f"|format(question.average_rating) }} / 5</span>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <!-- Text-based questions -->
+                        <div class="text-center py-8">
+                            <i class="fas fa-file-alt text-4xl text-gray-300 mb-4"></i>
+                            <p class="text-gray-500">Text responses collected ({{ question.total_responses }} total)</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Timeline Chart
+const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+const timelineData = {{ time_analytics.responses_over_time | tojson }};
+
+new Chart(timelineCtx, {
+    type: 'line',
+    data: {
+        labels: Object.keys(timelineData),
+        datasets: [{
+            label: 'Responses',
+            data: Object.values(timelineData),
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Question Charts
+{% for question in analytics_data %}
+{% if question.question_type in ['multiple_choice', 'checkbox', 'dropdown'] %}
+const ctx{{ question.question_id }} = document.getElementById('chart-{{ question.question_id }}').getContext('2d');
+new Chart(ctx{{ question.question_id }}, {
+    type: 'bar',
+    data: {
+        labels: {{ question.answers.keys() | list | tojson }},
+        datasets: [{
+            label: 'Responses',
+            data: {{ question.answers.values() | list }},
+            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+            borderColor: 'rgb(59, 130, 246)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+{% endif %}
+{% endfor %}
+</script>
+{% endblock %}

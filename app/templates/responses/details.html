@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Response Details - {{ form.title }}{% endblock %}
+
+{% block content %}
+<div class="py-8">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">Response Details</h1>
+                    <p class="mt-2 text-gray-600">Form: {{ form.title }}</p>
+                </div>
+                <div class="flex space-x-3">
+                    <a href="{{ url_for('responses.list_responses', form_id=form.id) }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        Back to Responses
+                    </a>
+                    <a href="{{ url_for('responses.form_analytics', form_id=form.id) }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition duration-150 ease-in-out">
+                        <i class="fas fa-chart-bar mr-2"></i>
+                        View Analytics
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Response Info -->
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
+            <div class="px-6 py-4 border-b">
+                <h2 class="text-lg font-medium text-gray-900">Response Information</h2>
+            </div>
+            <div class="px-6 py-4">
+                <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Response ID</dt>
+                        <dd class="mt-1 text-sm text-gray-900">#{{ response.id }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Submitted At</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ response.submitted_at.strftime('%B %d, %Y at %I:%M %p') if response.submitted_at else 'N/A' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Submitted By</dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {% if user_info %}
+                                {{ user_info.username }} ({{ user_info.email }})
+                            {% else %}
+                                Anonymous
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">IP Address</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ response.ip_address or 'N/A' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Answers -->
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div class="px-6 py-4 border-b">
+                <h2 class="text-lg font-medium text-gray-900">Answers</h2>
+            </div>
+            <div class="divide-y divide-gray-200">
+                {% for answer in answers %}
+                <div class="px-6 py-4">
+                    <div class="flex items-start">
+                        <div class="flex-1">
+                            <h3 class="text-sm font-medium text-gray-900">{{ answer.question.question_text }}</h3>
+                            <p class="mt-1 text-sm text-gray-600">Type: {{ answer.question.question_type.value|replace('_', ' ')|title }}</p>
+                        </div>
+                        <div class="ml-4 flex-1">
+                            <div class="text-sm text-gray-900">
+                                {% if answer.answer_text %}
+                                    <div class="bg-gray-50 rounded-md p-3">
+                                        {{ answer.answer_text }}
+                                    </div>
+                                {% elif answer.answer_value %}
+                                    {% if answer.question.question_type == 'file_upload' %}
+                                        {% if answer.answer_value.get('filename') %}
+                                        <div class="flex items-center space-x-2">
+                                            <i class="fas fa-file text-gray-400"></i>
+                                            <span class="text-sm text-gray-900">{{ answer.answer_value.filename }}</span>
+                                            <a href="/uploads/{{ answer.answer_value.filename }}" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">
+                                                <i class="fas fa-download mr-1"></i>Download
+                                            </a>
+                                        </div>
+                                        {% endif %}
+                                    {% elif answer.question.question_type in ['checkbox', 'multiple_choice'] %}
+                                        {% if answer.answer_value is iterable and answer.answer_value is not string %}
+                                        <div class="space-y-1">
+                                            {% for option in answer.answer_value %}
+                                            <div class="flex items-center">
+                                                <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                                                <span class="text-sm text-gray-900">{{ option }}</span>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% else %}
+                                        <div class="flex items-center">
+                                            <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                                            <span class="text-sm text-gray-900">{{ answer.answer_value }}</span>
+                                        </div>
+                                        {% endif %}
+                                    {% else %}
+                                    <div class="bg-gray-50 rounded-md p-3">
+                                        {{ answer.answer_value }}
+                                    </div>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-gray-500 italic">No answer provided</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="mt-8 flex justify-center space-x-4">
+            <button onclick="window.print()" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                <i class="fas fa-print mr-2"></i>
+                Print Response
+            </button>
+            <a href="mailto:?subject=Form Response Details&body=Response ID: {{ response.id }}%0AForm: {{ form.title }}%0ASubmitted: {{ response.submitted_at.strftime('%B %d, %Y') if response.submitted_at else 'N/A' }}"
+               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                <i class="fas fa-envelope mr-2"></i>
+                Email Details
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .no-print {
+        display: none !important;
+    }
+}
+</style>
+{% endblock %}
