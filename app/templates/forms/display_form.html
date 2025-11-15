@@ -3,139 +3,150 @@
 {% block title %}{{ form.title }} - Dynamic Form Builder{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h3>{{ form.title }}</h3>
+<div class="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h1 class="text-2xl font-bold text-gray-900">{{ form.title }}</h1>
                 {% if form.description %}
-                <p class="text-muted">{{ form.description }}</p>
+                <p class="mt-2 text-gray-600">{{ form.description }}</p>
                 {% endif %}
             </div>
-            <div class="card-body">
-                <form method="POST" action="{{ url_for('forms.submit_form', form_id=form.id) }}" enctype="multipart/form-data">
+            <div class="p-6">
+                <form method="POST" action="{{ url_for('forms.submit_form', form_id=form.id) }}" enctype="multipart/form-data" class="space-y-8">
                     {% for section in sections %}
-                    <div class="mb-4">
+                    <div class="space-y-6">
                         {% if section.title %}
-                        <h4>{{ section.title }}</h4>
+                        <h2 class="text-xl font-semibold text-gray-900">{{ section.title }}</h2>
                         {% endif %}
                         {% if section.description %}
-                        <p class="text-muted">{{ section.description }}</p>
+                        <p class="text-gray-600">{{ section.description }}</p>
                         {% endif %}
-                        
-                        {% for question in section.questions %}
-                        <div class="mb-3">
-                            <label for="question_{{ question.id }}" class="form-label">
-                                {{ question.question_text }}
-                                {% if question.is_required %}<span class="text-danger">*</span>{% endif %}
-                            </label>
-                            
-                            {% if question.question_type.value == 'text' %}
-                                <input type="text" 
-                                       class="form-control" 
-                                       id="question_{{ question.id }}" 
-                                       name="question_{{ question.id }}" 
-                                       {% if question.is_required %}required{% endif %}>
-                            
-                            {% elif question.question_type.value == 'long_text' %}
-                                <textarea class="form-control" 
-                                          id="question_{{ question.id }}" 
-                                          name="question_{{ question.id }}" 
-                                          rows="4"
-                                          {% if question.is_required %}required{% endif %}></textarea>
-                            
-                            {% elif question.question_type.value == 'multiple_choice' %}
-                                {% for option in question.options %}
-                                <div class="form-check">
-                                    <input class="form-check-input" 
-                                           type="radio" 
-                                           name="question_{{ question.id }}" 
-                                           id="question_{{ question.id }}_{{ loop.index }}"
-                                           value="{{ option }}"
+
+                        <div class="space-y-6">
+                            {% for question in section.questions %}
+                            <div>
+                                <label for="question_{{ question.id }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                    {{ question.question_text }}
+                                    {% if question.is_required %}<span class="text-red-500">*</span>{% endif %}
+                                </label>
+
+                                {% if question.question_type.value == 'text' %}
+                                    <input type="text"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           id="question_{{ question.id }}"
+                                           name="question_{{ question.id }}"
                                            {% if question.is_required %}required{% endif %}>
-                                    <label class="form-check-label" for="question_{{ question.id }}_{{ loop.index }}">
-                                        {{ option }}
-                                    </label>
-                                </div>
-                                {% endfor %}
-                            
-                            {% elif question.question_type.value == 'checkbox' %}
-                                {% for option in question.options %}
-                                <div class="form-check">
-                                    <input class="form-check-input" 
-                                           type="checkbox" 
-                                           name="question_{{ question.id }}" 
-                                           id="question_{{ question.id }}_{{ loop.index }}"
-                                           value="{{ option }}">
-                                    <label class="form-check-label" for="question_{{ question.id }}_{{ loop.index }}">
-                                        {{ option }}
-                                    </label>
-                                </div>
-                                {% endfor %}
-                            
-                            {% elif question.question_type.value == 'dropdown' %}
-                                <select class="form-select" 
-                                        id="question_{{ question.id }}" 
-                                        name="question_{{ question.id }}" 
-                                        {% if question.is_required %}required{% endif %}>
-                                    <option value="">Select an option</option>
-                                    {% for option in question.options %}
-                                    <option value="{{ option }}">{{ option }}</option>
-                                    {% endfor %}
-                                </select>
-                            
-                            {% elif question.question_type.value == 'rating' %}
-                                <div class="rating-options">
-                                    {% for i in range(1, 6) %}
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" 
-                                               type="radio" 
-                                               name="question_{{ question.id }}" 
-                                               id="question_{{ question.id }}_{{ i }}"
-                                               value="{{ i }}"
-                                               {% if question.is_required %}required{% endif %}>
-                                        <label class="form-check-label" for="question_{{ question.id }}_{{ i }}">
-                                            {{ i }}
-                                        </label>
+
+                                {% elif question.question_type.value == 'long_text' %}
+                                    <textarea class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                              id="question_{{ question.id }}"
+                                              name="question_{{ question.id }}"
+                                              rows="4"
+                                              {% if question.is_required %}required{% endif %}></textarea>
+
+                                {% elif question.question_type.value == 'multiple_choice' %}
+                                    <div class="space-y-2">
+                                        {% for option in question.options %}
+                                        <div class="flex items-center">
+                                            <input class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                                   type="radio"
+                                                   name="question_{{ question.id }}"
+                                                   id="question_{{ question.id }}_{{ loop.index }}"
+                                                   value="{{ option }}"
+                                                   {% if question.is_required %}required{% endif %}>
+                                            <label class="ml-2 block text-sm text-gray-900" for="question_{{ question.id }}_{{ loop.index }}">
+                                                {{ option }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
                                     </div>
-                                    {% endfor %}
-                                </div>
-                            
-                            {% elif question.question_type.value == 'file_upload' %}
-                                <input type="file" 
-                                       class="form-control" 
-                                       id="question_{{ question.id }}" 
-                                       name="question_{{ question.id }}"
-                                       {% if question.is_required %}required{% endif %}>
-                            
-                            {% elif question.question_type.value == 'date' %}
-                                <input type="date" 
-                                       class="form-control" 
-                                       id="question_{{ question.id }}" 
-                                       name="question_{{ question.id }}" 
-                                       {% if question.is_required %}required{% endif %}>
-                            
-                            {% elif question.question_type.value == 'email' %}
-                                <input type="email" 
-                                       class="form-control" 
-                                       id="question_{{ question.id }}" 
-                                       name="question_{{ question.id }}" 
-                                       {% if question.is_required %}required{% endif %}>
-                            
-                            {% elif question.question_type.value == 'number' %}
-                                <input type="number" 
-                                       class="form-control" 
-                                       id="question_{{ question.id }}" 
-                                       name="question_{{ question.id }}" 
-                                       {% if question.is_required %}required{% endif %}>
-                            
-                            {% endif %}
+
+                                {% elif question.question_type.value == 'checkbox' %}
+                                    <div class="space-y-2">
+                                        {% for option in question.options %}
+                                        <div class="flex items-center">
+                                            <input class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                                   type="checkbox"
+                                                   name="question_{{ question.id }}"
+                                                   id="question_{{ question.id }}_{{ loop.index }}"
+                                                   value="{{ option }}">
+                                            <label class="ml-2 block text-sm text-gray-900" for="question_{{ question.id }}_{{ loop.index }}">
+                                                {{ option }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+
+                                {% elif question.question_type.value == 'dropdown' %}
+                                    <select class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            id="question_{{ question.id }}"
+                                            name="question_{{ question.id }}"
+                                            {% if question.is_required %}required{% endif %}>
+                                        <option value="">Select an option</option>
+                                        {% for option in question.options %}
+                                        <option value="{{ option }}">{{ option }}</option>
+                                        {% endfor %}
+                                    </select>
+
+                                {% elif question.question_type.value == 'rating' %}
+                                    <div class="flex space-x-4">
+                                        {% for i in range(1, 6) %}
+                                        <div class="flex items-center">
+                                            <input class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                                   type="radio"
+                                                   name="question_{{ question.id }}"
+                                                   id="question_{{ question.id }}_{{ i }}"
+                                                   value="{{ i }}"
+                                                   {% if question.is_required %}required{% endif %}>
+                                            <label class="ml-1 block text-sm text-gray-900" for="question_{{ question.id }}_{{ i }}">
+                                                {{ i }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+
+                                {% elif question.question_type.value == 'file_upload' %}
+                                    <input type="file"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           id="question_{{ question.id }}"
+                                           name="question_{{ question.id }}"
+                                           {% if question.is_required %}required{% endif %}>
+
+                                {% elif question.question_type.value == 'date' %}
+                                    <input type="date"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           id="question_{{ question.id }}"
+                                           name="question_{{ question.id }}"
+                                           {% if question.is_required %}required{% endif %}>
+
+                                {% elif question.question_type.value == 'email' %}
+                                    <input type="email"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           id="question_{{ question.id }}"
+                                           name="question_{{ question.id }}"
+                                           {% if question.is_required %}required{% endif %}>
+
+                                {% elif question.question_type.value == 'number' %}
+                                    <input type="number"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           id="question_{{ question.id }}"
+                                           name="question_{{ question.id }}"
+                                           {% if question.is_required %}required{% endif %}>
+
+                                {% endif %}
+                            </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
                     </div>
                     {% endfor %}
-                    
-                    <button type="submit" class="btn btn-primary">Submit Form</button>
+
+                    <div class="flex justify-end">
+                        <button type="submit" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                            <i class="fas fa-paper-plane mr-2"></i>
+                            Submit Form
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>

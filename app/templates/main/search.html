@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Search Results - {{ query }}{% endblock %}
+
+{% block content %}
+<div class="py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">Search Results</h1>
+                    {% if query %}
+                    <p class="mt-2 text-gray-600">Showing results for "<strong>{{ query }}</strong>"</p>
+                    {% else %}
+                    <p class="mt-2 text-gray-600">Enter a search term to find forms</p>
+                    {% endif %}
+                </div>
+                <a href="{{ url_for('main.index') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                    <i class="fas fa-home mr-2"></i>
+                    Back to Home
+                </a>
+            </div>
+        </div>
+
+        <!-- Search Form -->
+        <div class="mb-8">
+            <form method="GET" action="{{ url_for('main.search') }}" class="max-w-md">
+                <div class="flex">
+                    <div class="relative flex-1">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                        <input type="text" name="q" value="{{ query }}" placeholder="Search forms..."
+                               class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-l-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+                        Search
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Results -->
+        {% if forms %}
+        <div class="mb-6">
+            <p class="text-gray-600">{{ forms | length }} form{{ 's' if forms | length != 1 else '' }} found</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for form in forms %}
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition duration-300 ease-in-out">
+                <div class="p-6">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ form.title }}</h3>
+                            {% if form.description %}
+                            <p class="text-gray-600 text-sm mb-3 line-clamp-2">{{ form.description }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="text-sm text-gray-500">
+                            <span>By {{ form.creator.username if form.creator else 'Unknown' }}</span>
+                        </div>
+                        <div class="text-sm text-gray-500">
+                            <span>{{ form.created_at.strftime('%b %d, %Y') if form.created_at else 'N/A' }}</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            {% if form.is_published %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Published
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                Draft
+                            </span>
+                            {% endif %}
+                        </div>
+                        <a href="{{ url_for('forms.display_form', form_id=form.id) }}"
+                           class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition duration-150 ease-in-out">
+                            <i class="fas fa-external-link-alt mr-2"></i>
+                            View Form
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            {% if query %}
+            <i class="fas fa-search text-6xl text-gray-300 mb-4"></i>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No forms found</h3>
+            <p class="text-gray-500 mb-4">Try adjusting your search terms or browse all available forms.</p>
+            <a href="{{ url_for('main.index') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition duration-150 ease-in-out">
+                <i class="fas fa-home mr-2"></i>
+                Browse All Forms
+            </a>
+            {% else %}
+            <i class="fas fa-search text-6xl text-gray-300 mb-4"></i>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">Search for Forms</h3>
+            <p class="text-gray-500">Enter keywords in the search box above to find forms by title or description.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Popular Searches or Suggestions -->
+        {% if not forms and not query %}
+        <div class="mt-12 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg shadow-lg">
+            <div class="px-6 py-8">
+                <h2 class="text-xl font-bold text-gray-900 mb-4">Popular Search Terms</h2>
+                <div class="flex flex-wrap gap-2">
+                    <a href="{{ url_for('main.search', q='survey') }}" class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 hover:bg-blue-200 transition duration-150 ease-in-out">
+                        Survey
+                    </a>
+                    <a href="{{ url_for('main.search', q='feedback') }}" class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800 hover:bg-green-200 transition duration-150 ease-in-out">
+                        Feedback
+                    </a>
+                    <a href="{{ url_for('main.search', q='registration') }}" class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800 hover:bg-purple-200 transition duration-150 ease-in-out">
+                        Registration
+                    </a>
+                    <a href="{{ url_for('main.search', q='contact') }}" class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition duration-150 ease-in-out">
+                        Contact
+                    </a>
+                    <a href="{{ url_for('main.search', q='application') }}" class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-red-100 text-red-800 hover:bg-red-200 transition duration-150 ease-in-out">
+                        Application
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+</style>
+{% endblock %}
