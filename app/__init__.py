@@ -75,6 +75,13 @@ def create_app(config_name='default'):
     # Register error handlers
     from app.errors import bp as errors_bp
     app.register_blueprint(errors_bp)
+
+    # Context processor for current user
+    @app.context_processor
+    def inject_current_user():
+        from flask import session
+        user = session.get('user')
+        return {'current_user': user}
     
     # Initialize Celery with Flask app context
     class ContextTask(celery.Task):

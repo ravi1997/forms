@@ -1,4 +1,4 @@
-from flask import request, jsonify, current_app
+from flask import request, jsonify, current_app, render_template
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, get_jwt
 from app import db
 from app.auth import bp
@@ -14,21 +14,38 @@ users_schema = UserSchema(many=True)
 login_schema = LoginFormSchema()
 register_schema = RegisterFormSchema()
 
-@bp.route('/register', methods=['POST'])
+@bp.route('/register', methods=['GET', 'POST'])
 def register():
     """Register a new user account"""
+    if request.method == 'GET':
+        return render_template('auth/register.html')
+
     try:
+        # Determine input type
+        if request.is_json:
+            data = request.json
+        else:
+            data = request.form.to_dict()
+
         # Validate and deserialize input
-        errors = register_schema.validate(request.json)
+        errors = register_schema.validate(data)
         if errors:
-            return jsonify({'error': 'validation_error', 'message': 'Invalid input data', 'details': errors}), 400
-        
+            if request.is_json:
+                return jsonify({'error': 'validation_error', 'message': 'Invalid input data', 'details': errors}), 400
+            else:
+                # For form, flash errors or redirect
+                # For simplicity, redirect back with errors
+                from flask import flash, redirect, url_for
+                for field, msgs in errors.items():
+                    flash(f"{field}: {'; '.join(msgs)}", 'error')
+                return redirect(url_for('auth.register'))
+
         # Extract data
-        username = request.json.get('username')
-        email = request.json.get('email')
-        password = request.json.get('password')
-        first_name = request.json.get('first_name', '')
-        last_name = request.json.get('last_name', '')
+        username = data.get('username')
+        email = data.get('email')
+        password = data.get('password')
+        first_name = data.get('first_name', '')
+        last_name = data.get('last_name', '')
         
         # Check if user already exists
         if User.query.filter_by(username=username).first():
@@ -53,33 +70,61 @@ def register():
         
         # Return user data (without password)
         result = user_schema.dump(user)
-        return jsonify({'message': 'User registered successfully', 'data': result}), 201
+        if request.is_json:
+            return jsonify({'message': 'User registered successfully', 'data': result}), 201
+        else:
+            from flask import flash, redirect, url_for
+            flash('Registration successful! Please login.', 'success')
+            return redirect(url_for('auth.login'))
     
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Registration error: {str(e)}")
         return jsonify({'error': 'registration_failed', 'message': 'Registration failed'}), 500
 
-@bp.route('/login', methods=['POST'])
+@bp.route('/login', methods=['GET', 'POST'])
 def login():
     """Authenticate user and return JWT tokens"""
+    if request.method == 'GET':
+        return render_template('auth/login.html')
+
     try:
+        # Determine input type
+        if request.is_json:
+            data = request.json
+        else:
+            data = request.form.to_dict()
+
         # Validate input
-        errors = login_schema.validate(request.json)
+        errors = login_schema.validate(data)
         if errors:
-            return jsonify({'error': 'validation_error', 'message': 'Invalid input data', 'details': errors}), 40
-        
-        username = request.json.get('username')
-        password = request.json.get('password')
+            if request.is_json:
+                return jsonify({'error': 'validation_error', 'message': 'Invalid input data', 'details': errors}), 400
+            else:
+                from flask import flash, redirect, url_for
+                flash('Invalid username or password', 'error')
+                return redirect(url_for('auth.login'))
+
+        username = data.get('username')
+        password = data.get('password')
         
         # Find user
         user = User.query.filter_by(username=username).first()
         
         if not user or not user.check_password(password):
-            return jsonify({'error': 'invalid_credentials', 'message': 'Invalid username or password'}), 401
-        
+            if request.is_json:
+                return jsonify({'error': 'invalid_credentials', 'message': 'Invalid username or password'}), 401
+            else:
+                from flask import flash, redirect, url_for
+                flash('Invalid username or password', 'error')
+                return redirect(url_for('auth.login'))
+
         if not user.is_active:
-            return jsonify({'error': 'account_disabled', 'message': 'Account is disabled'}), 401
+            if request.is_json:
+                return jsonify({'error': 'account_disabled', 'message': 'Account is disabled'}), 401
+            else:
+                flash('Account is disabled', 'error')
+                return redirect(url_for('auth.login'))
         
         # Create tokens
         access_token = create_access_token(identity=user.id)
@@ -89,25 +134,32 @@ def login():
         user.last_login = datetime.utcnow()
         db.session.commit()
         
-        return jsonify({
-            'message': 'Login successful',
-            'access_token': access_token,
-            'refresh_token': refresh_token,
-            'user': user_schema.dump(user)
-        }), 200
+        if request.is_json:
+            return jsonify({
+                'message': 'Login successful',
+                'access_token': access_token,
+                'refresh_token': refresh_token,
+                'user': user_schema.dump(user)
+            }), 200
+        else:
+            from flask import session, redirect, url_for
+            session['access_token'] = access_token
+            session['refresh_token'] = refresh_token
+            session['user'] = user_schema.dump(user)
+            return redirect(url_for('main.dashboard'))
     
     except Exception as e:
         current_app.logger.error(f"Login error: {str(e)}")
         return jsonify({'error': 'login_failed', 'message': 'Login failed'}), 500
 
-@bp.route('/logout', methods=['POST'])
-@jwt_required()
+@bp.route('/logout', methods=['GET', 'POST'])
 def logout():
     """Invalidate user session"""
-    # In a real application, you would add the token to a blacklist
-    current_user_id = get_jwt_identity()
-    current_app.logger.info(f"User {current_user_id} logged out")
-    return jsonify({'message': 'Logged out successfully'}), 200
+    from flask import session, redirect, url_for, flash
+    # Clear session
+    session.clear()
+    flash('Logged out successfully', 'success')
+    return redirect(url_for('main.index'))
 
 @bp.route('/profile', methods=['GET'])
 @jwt_required()

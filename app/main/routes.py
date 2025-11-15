@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, current_app
+from flask import render_template, request, jsonify, current_app, session, redirect, url_for
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.main import bp
@@ -21,10 +21,20 @@ def index():
         return render_template('main/index.html', published_forms=published_forms)
 
 @bp.route('/dashboard')
-@jwt_required()
 def dashboard():
     """User dashboard"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash
+            flash('Please login to access the dashboard', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+    
     user = User.query.get_or_404(current_user_id)
     
     # Get user's forms
@@ -48,10 +58,20 @@ def dashboard():
                           recent_forms=recent_forms)
 
 @bp.route('/profile')
-@jwt_required()
 def profile():
     """User profile page"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash
+            flash('Please login to access your profile', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+    
     user = User.query.get_or_404(current_user_id)
     
     return render_template('main/profile.html', user=user)
