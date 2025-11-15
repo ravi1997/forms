@@ -17,16 +17,18 @@
         </div>
 
         {% if questions %}
+        {% set user_id = current_user.get('id') if current_user else None %}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for question in questions %}
             <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition duration-300 ease-in-out">
                 <div class="p-6">
                     <div class="flex items-start justify-between mb-4">
                         <div class="flex-1">
+                            {% set question_type_value = question.question_type.value if question.question_type is not string else question.question_type %}
                             <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ question.question_text }}</h3>
                             <div class="flex items-center space-x-2 mb-2">
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                    {{ question.question_type|replace('_', ' ')|title }}
+                                    {{ question_type_value|replace('_', ' ')|title }}
                                 </span>
                                 {% if question.is_required %}
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -44,14 +46,23 @@
                                 {% endif %}
                             </div>
                         </div>
+                        {% set can_manage = user_id and question.created_by == user_id %}
+                        {% if can_manage %}
                         <div class="flex space-x-2">
-                            <button class="edit-question text-blue-600 hover:text-blue-800" data-id="{{ question.id }}">
+                            <button class="edit-question text-blue-600 hover:text-blue-800"
+                                    data-id="{{ question.id }}"
+                                    data-text="{{ question.question_text }}"
+                                    data-type="{{ question_type_value }}"
+                                    data-options='{{ (question.options or []) | tojson | e }}'
+                                    data-required="{{ 'true' if question.is_required else 'false' }}"
+                                    data-public="{{ 'true' if question.is_public else 'false' }}">
                                 <i class="fas fa-edit"></i>
                             </button>
                             <button class="delete-question text-red-600 hover:text-red-800" data-id="{{ question.id }}">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
+                        {% endif %}
                     </div>
 
                     {% if question.options %}
@@ -168,51 +179,156 @@
 </div>
 
 <script>
-// Question library JavaScript
 document.addEventListener('DOMContentLoaded', function() {
     const modal = document.getElementById('questionModal');
     const form = document.getElementById('questionForm');
+    const modalTitle = document.getElementById('modalTitle');
     const questionTypeSelect = document.getElementById('questionType');
     const optionsContainer = document.getElementById('optionsContainer');
+    const optionsList = document.getElementById('optionsList');
+    const addOptionBtn = document.getElementById('addOption');
+    const addQuestionBtn = document.getElementById('addQuestionBtn');
+    const addFirstQuestionBtn = document.getElementById('addFirstQuestionBtn');
+    const closeModalBtn = document.getElementById('closeModal');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const collectionUrl = "{{ url_for('forms.question_library') }}";
+    const typesWithOptions = ['multiple_choice', 'checkbox', 'dropdown'];
+    let editingQuestionId = null;
 
-    // Show/hide options based on question type
-    questionTypeSelect.addEventListener('change', function() {
-        const typesWithOptions = ['multiple_choice', 'checkbox', 'dropdown'];
-        optionsContainer.style.display = typesWithOptions.includes(this.value) ? 'block' : 'none';
-    });
+    function toggleOptionsContainer() {
+        optionsContainer.style.display = typesWithOptions.includes(questionTypeSelect.value) ? 'block' : 'none';
+    }
 
-    // Add option button
-    document.getElementById('addOption').addEventListener('click', function() {
+    function addOptionField(value = '') {
         const optionDiv = document.createElement('div');
         optionDiv.className = 'flex items-center space-x-2 mb-2';
         optionDiv.innerHTML = `
             <input type="text" name="options[]" placeholder="New option" class="flex-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-            <button type="button" class="remove-option text-red-600 hover:text-red-800">
+            <button type="button" class="remove-option text-red-600 hover:text-red-800" aria-label="Remove option">
                 <i class="fas fa-trash"></i>
             </button>
         `;
-        document.getElementById('optionsList').appendChild(optionDiv);
-    });
+        optionsList.appendChild(optionDiv);
+        optionDiv.querySelector('input').value = value;
+    }
 
-    // Remove option
+    function resetForm() {
+        form.reset();
+        optionsList.innerHTML = '';
+        addOptionField('');
+        toggleOptionsContainer();
+    }
+
+    function openModal(questionData = null) {
+        editingQuestionId = questionData ? questionData.id : null;
+        modalTitle.textContent = questionData ? 'Edit Question' : 'Add Question';
+        resetForm();
+        if (questionData) {
+            document.getElementById('questionText').value = questionData.text || '';
+            questionTypeSelect.value = questionData.type || 'text';
+            document.getElementById('isRequired').checked = questionData.is_required || false;
+            document.getElementById('isPublic').checked = questionData.is_public || false;
+            toggleOptionsContainer();
+            if (questionData.options && questionData.options.length) {
+                optionsList.innerHTML = '';
+                questionData.options.forEach(opt => addOptionField(opt));
+            }
+        }
+        modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+        modal.classList.add('hidden');
+        editingQuestionId = null;
+        resetForm();
+    }
+
+    questionTypeSelect.addEventListener('change', toggleOptionsContainer);
+    addOptionBtn.addEventListener('click', () => addOptionField(''));
+
     document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('remove-option') || e.target.parentElement.classList.contains('remove-option')) {
-            e.target.closest('.flex').remove();
+        const removeBtn = e.target.closest('.remove-option');
+        if (removeBtn) {
+            removeBtn.closest('.flex').remove();
+        }
+
+        const editBtn = e.target.closest('.edit-question');
+        if (editBtn) {
+            const questionData = {
+                id: editBtn.dataset.id,
+                text: editBtn.dataset.text,
+                type: editBtn.dataset.type,
+                options: editBtn.dataset.options ? JSON.parse(editBtn.dataset.options) : [],
+                is_required: editBtn.dataset.required === 'true',
+                is_public: editBtn.dataset.public === 'true'
+            };
+            openModal(questionData);
+        }
+
+        const deleteBtn = e.target.closest('.delete-question');
+        if (deleteBtn) {
+            const questionId = deleteBtn.dataset.id;
+            if (confirm('Delete this question from your library?')) {
+                fetch(`${collectionUrl}/${questionId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({})
+                }).then(async response => {
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw new Error(data.message || 'Unable to delete question');
+                    }
+                    window.location.reload();
+                }).catch(error => alert(error.message));
+            }
         }
     });
 
-    // Modal controls
-    document.getElementById('addQuestionBtn').addEventListener('click', () => modal.classList.remove('hidden'));
-    document.getElementById('addFirstQuestionBtn').addEventListener('click', () => modal.classList.remove('hidden'));
-    document.getElementById('closeModal').addEventListener('click', () => modal.classList.add('hidden'));
-    document.getElementById('cancelBtn').addEventListener('click', () => modal.classList.add('hidden'));
+    [addQuestionBtn, addFirstQuestionBtn].filter(Boolean).forEach(btn => {
+        btn.addEventListener('click', () => openModal());
+    });
 
-    // Form submission
+    [closeModalBtn, cancelBtn].forEach(btn => {
+        if (btn) btn.addEventListener('click', closeModal);
+    });
+
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        // Handle form submission via AJAX
-        console.log('Question form submitted');
-        modal.classList.add('hidden');
+        const options = Array.from(optionsList.querySelectorAll('input[name="options[]"]'))
+            .map(input => input.value.trim())
+            .filter(Boolean);
+        const payload = {
+            question_text: document.getElementById('questionText').value.trim(),
+            question_type: questionTypeSelect.value,
+            options: options,
+            is_required: document.getElementById('isRequired').checked,
+            is_public: document.getElementById('isPublic').checked
+        };
+
+        const url = editingQuestionId ? `${collectionUrl}/${editingQuestionId}` : collectionUrl;
+        const method = editingQuestionId ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
+        }).then(async response => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.message || 'Unable to save question');
+            }
+            window.location.reload();
+        }).catch(error => {
+            alert(error.message);
+        });
     });
 });
 </script>

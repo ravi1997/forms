@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, current_app, redirect, url_for, session
+from flask import render_template, request, jsonify, current_app, redirect, url_for, session, flash
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.forms import bp
@@ -9,6 +9,52 @@ from datetime import datetime
 form_schema = FormSchema()
 section_schema = SectionSchema()
 question_schema = QuestionSchema()
+
+def _get_current_user_id():
+    """Return the authenticated user's ID from JWT or session, otherwise None."""
+    try:
+        return get_jwt_identity()
+    except Exception:
+        user_data = session.get('user')
+        if user_data:
+            return user_data.get('id')
+    return None
+
+def _login_required_response(message):
+    """Return an authentication required response appropriate for the request type."""
+    if request.is_json:
+        return jsonify({'error': 'authentication_required', 'message': message}), 401
+    flash(message, 'error')
+    return redirect(url_for('auth.login'))
+
+def _permission_denied_response(message, redirect_endpoint='main.dashboard'):
+    """Return a permission denied response appropriate for the request type."""
+    if request.is_json:
+        return jsonify({'error': 'forbidden', 'message': message}), 403
+    flash(message, 'error')
+    return redirect(url_for(redirect_endpoint))
+
+def _parse_question_payload():
+    """Extract question payload data from JSON or form submissions."""
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        options = data.get('options') or []
+        if not isinstance(options, list):
+            options = [options]
+        is_required = bool(data.get('is_required'))
+        is_public = bool(data.get('is_public'))
+    else:
+        data = request.form
+        options = request.form.getlist('options[]')
+        is_required = data.get('is_required') == 'on'
+        is_public = data.get('is_public') == 'on'
+
+    question_text = (data.get('question_text') or '').strip()
+    question_type = data.get('question_type')
+    # Clean up option values and drop empties
+    cleaned_options = [opt.strip() for opt in options if opt and str(opt).strip()]
+
+    return question_text, question_type, cleaned_options, is_required, is_public
 
 @bp.route('/<int:form_id>', methods=['GET'])
 def display_form(form_id):
@@ -425,6 +471,97 @@ def delete_form(form_id):
             flash('Failed to delete form', 'error')
             return redirect(url_for('forms.my_forms'))
 
+@bp.route('/<int:form_id>/publish', methods=['POST'])
+def publish_form(form_id):
+    """Publish a form so it becomes publicly accessible."""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to publish forms')
+
+    form = Form.query.get_or_404(form_id)
+    if form.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to publish this form')
+
+    form.is_published = True
+    form.is_archived = False
+    form.published_at = datetime.utcnow()
+    form.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    message = 'Form published successfully'
+    if request.is_json:
+        return jsonify({'message': message, 'form_id': form.id, 'status': 'published'}), 200
+
+    flash(message, 'success')
+    return redirect(request.referrer or url_for('forms.form_builder', form_id=form.id))
+
+@bp.route('/<int:form_id>/unpublish', methods=['POST'])
+def unpublish_form(form_id):
+    """Mark a form as draft so it is no longer public."""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to update forms')
+
+    form = Form.query.get_or_404(form_id)
+    if form.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to unpublish this form')
+
+    form.is_published = False
+    form.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    message = 'Form unpublished successfully'
+    if request.is_json:
+        return jsonify({'message': message, 'form_id': form.id, 'status': 'draft'}), 200
+
+    flash(message, 'success')
+    return redirect(request.referrer or url_for('forms.form_builder', form_id=form.id))
+
+@bp.route('/<int:form_id>/archive', methods=['POST'])
+def archive_form(form_id):
+    """Archive a form to remove it from the active list."""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to archive forms')
+
+    form = Form.query.get_or_404(form_id)
+    if form.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to archive this form')
+
+    form.is_archived = True
+    form.is_published = False
+    form.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    message = 'Form archived successfully'
+    if request.is_json:
+        return jsonify({'message': message, 'form_id': form.id, 'status': 'archived'}), 200
+
+    flash(message, 'success')
+    return redirect(request.referrer or url_for('forms.my_forms'))
+
+@bp.route('/<int:form_id>/restore', methods=['POST'])
+def restore_form(form_id):
+    """Restore an archived form."""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to restore forms')
+
+    form = Form.query.get_or_404(form_id)
+    if form.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to restore this form')
+
+    form.is_archived = False
+    form.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    message = 'Form restored successfully'
+    if request.is_json:
+        return jsonify({'message': message, 'form_id': form.id, 'status': 'draft'}), 200
+
+    flash(message, 'success')
+    return redirect(request.referrer or url_for('forms.my_forms'))
+
 @bp.route('/my-forms', methods=['GET'])
 def my_forms():
     """List user's forms"""
@@ -528,28 +665,18 @@ def question_library():
 @bp.route('/question_library', methods=['POST'])
 def add_to_question_library():
     """Add a question to the library"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to add questions', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to add questions')
 
-    # Get data from request
-    question_text = request.form.get('question_text')
-    question_type = request.form.get('question_type')
-    options = request.form.getlist('options[]')  # For multiple choice, checkboxes, dropdowns
-    is_required = request.form.get('is_required') == 'on'
-    is_public = request.form.get('is_public') == 'on'
+    question_text, question_type, options, is_required, is_public = _parse_question_payload()
 
     # Validate required fields
     if not question_text or not question_type:
-        return jsonify({'error': 'validation_error', 'message': 'Question text and type are required'}), 400
+        if request.is_json:
+            return jsonify({'error': 'validation_error', 'message': 'Question text and type are required'}), 400
+        flash('Question text and type are required', 'error')
+        return redirect(url_for('forms.question_library'))
 
     # Create new question library entry
     question_lib = QuestionLibrary(
@@ -564,7 +691,87 @@ def add_to_question_library():
     db.session.add(question_lib)
     db.session.commit()
 
-    return jsonify({'message': 'Question added to library successfully'}), 201
+    success_message = 'Question added to library successfully'
+    if request.is_json:
+        return jsonify({
+            'message': success_message,
+            'question': {
+                'id': question_lib.id,
+                'question_text': question_lib.question_text,
+                'question_type': getattr(question_lib.question_type, 'value', question_lib.question_type),
+                'options': question_lib.options or [],
+                'is_required': question_lib.is_required,
+                'is_public': question_lib.is_public
+            }
+        }), 201
+
+    flash(success_message, 'success')
+    return redirect(url_for('forms.question_library'))
+
+@bp.route('/question_library/<int:question_id>', methods=['PUT'])
+def update_question_library(question_id):
+    """Update an existing question library entry."""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to update questions')
+
+    question = QuestionLibrary.query.get_or_404(question_id)
+    if question.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to edit this question', 'forms.question_library')
+
+    question_text, question_type, options, is_required, is_public = _parse_question_payload()
+
+    if not question_text or not question_type:
+        if request.is_json:
+            return jsonify({'error': 'validation_error', 'message': 'Question text and type are required'}), 400
+        flash('Question text and type are required', 'error')
+        return redirect(url_for('forms.question_library'))
+
+    question.question_text = question_text
+    question.question_type = question_type
+    question.options = options or None
+    question.is_required = is_required
+    question.is_public = is_public
+
+    db.session.commit()
+
+    message = 'Question updated successfully'
+    if request.is_json:
+        return jsonify({
+            'message': message,
+            'question': {
+                'id': question.id,
+                'question_text': question.question_text,
+                'question_type': getattr(question.question_type, 'value', question.question_type),
+                'options': question.options or [],
+                'is_required': question.is_required,
+                'is_public': question.is_public
+            }
+        }), 200
+
+    flash(message, 'success')
+    return redirect(url_for('forms.question_library'))
+
+@bp.route('/question_library/<int:question_id>', methods=['DELETE'])
+def delete_question_library(question_id):
+    """Delete a question from the library."""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to delete questions')
+
+    question = QuestionLibrary.query.get_or_404(question_id)
+    if question.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to delete this question', 'forms.question_library')
+
+    db.session.delete(question)
+    db.session.commit()
+
+    message = 'Question deleted successfully'
+    if request.is_json:
+        return jsonify({'message': message, 'question_id': question_id}), 200
+
+    flash(message, 'success')
+    return redirect(url_for('forms.question_library'))
 
 @bp.route('/create', methods=['GET', 'POST'])
 def create_form():

@@ -3,13 +3,24 @@
 {% block title %}Form Builder - {{ form.title }}{% endblock %}
 
 {% block content %}
+{% set form_state = 'archived' if form.is_archived else 'published' if form.is_published else 'draft' %}
 <div class="min-h-screen bg-gray-50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Header -->
         <div class="mb-8">
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900">{{ form.title }}</h1>
+                    <div class="flex items-center space-x-3">
+                        <h1 class="text-3xl font-bold text-gray-900">{{ form.title }}</h1>
+                        <span id="formStateBadge"
+                              data-state="{{ form_state }}"
+                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                              {% if form_state == 'published' %}bg-green-100 text-green-800
+                              {% elif form_state == 'archived' %}bg-gray-100 text-gray-800
+                              {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ form_state|capitalize }}
+                        </span>
+                    </div>
                     {% if form.description %}
                     <p class="mt-2 text-gray-600">{{ form.description }}</p>
                     {% endif %}
@@ -28,6 +39,9 @@
                         Back
                     </a>
                 </div>
+            </div>
+            <div id="formStatusMessage" class="hidden mt-4 rounded-md border px-4 py-3 text-sm" role="status" aria-live="polite">
+                <p id="formStatusText" class="font-medium"></p>
             </div>
         </div>
 
@@ -104,6 +118,12 @@
                             <i class="fas fa-eye-slash mr-2"></i>
                             Unpublish
                         </button>
+                        <button id="archiveForm"
+                                data-archived="{{ 'true' if form.is_archived else 'false' }}"
+                                class="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white {% if form.is_archived %}bg-blue-600 hover:bg-blue-700{% else %}bg-red-600 hover:bg-red-700{% endif %} transition duration-150 ease-in-out">
+                            <i class="fas {% if form.is_archived %}fa-box-open{% else %}fa-archive{% endif %} mr-2"></i>
+                            {% if form.is_archived %}Restore Form{% else %}Archive Form{% endif %}
+                        </button>
                         <a href="{{ url_for('responses.list_responses', form_id=form.id) }}" class="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
                             <i class="fas fa-chart-bar mr-2"></i>
                             View Responses
@@ -162,10 +182,109 @@
 </template>
 
 <script>
-// Form builder JavaScript will go here
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize form builder
-    console.log('Form builder initialized');
+    const statusBadge = document.getElementById('formStateBadge');
+    const statusMessage = document.getElementById('formStatusMessage');
+    const statusText = document.getElementById('formStatusText');
+    const publishBtn = document.getElementById('publishForm');
+    const unpublishBtn = document.getElementById('unpublishForm');
+    const archiveBtn = document.getElementById('archiveForm');
+    const baseBadgeClasses = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
+    const stateClasses = {
+        published: 'bg-green-100 text-green-800',
+        draft: 'bg-yellow-100 text-yellow-800',
+        archived: 'bg-gray-100 text-gray-800'
+    };
+    const actionUrls = {
+        publish: "{{ url_for('forms.publish_form', form_id=form.id) }}",
+        unpublish: "{{ url_for('forms.unpublish_form', form_id=form.id) }}",
+        archive: "{{ url_for('forms.archive_form', form_id=form.id) }}",
+        restore: "{{ url_for('forms.restore_form', form_id=form.id) }}"
+    };
+
+    function applyStatusMessageClasses(type) {
+        const variants = {
+            success: 'mt-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800',
+            error: 'mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800',
+            info: 'mt-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800'
+        };
+        statusMessage.className = variants[type] || variants.success;
+    }
+
+    function showMessage(message, type = 'success') {
+        if (!statusMessage || !statusText) return;
+        applyStatusMessageClasses(type);
+        statusText.textContent = message;
+    }
+
+    function updateBadge(state) {
+        if (!statusBadge) return;
+        const normalizedState = stateClasses[state] ? state : 'draft';
+        statusBadge.dataset.state = normalizedState;
+        statusBadge.className = `${baseBadgeClasses} ${stateClasses[normalizedState]}`;
+        statusBadge.textContent = normalizedState.charAt(0).toUpperCase() + normalizedState.slice(1);
+    }
+
+    function toggleArchiveButton(state) {
+        if (!archiveBtn) return;
+        const archived = state === 'archived';
+        archiveBtn.dataset.archived = archived ? 'true' : 'false';
+        archiveBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700', 'bg-red-600', 'hover:bg-red-700');
+        if (archived) {
+            archiveBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            archiveBtn.innerHTML = '<i class="fas fa-box-open mr-2"></i>Restore Form';
+        } else {
+            archiveBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            archiveBtn.innerHTML = '<i class="fas fa-archive mr-2"></i>Archive Form';
+        }
+    }
+
+    async function postStateChange(url, nextState, fallbackMessage) {
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({})
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.message || 'Unable to update form');
+            }
+            updateBadge(nextState);
+            toggleArchiveButton(nextState);
+            showMessage(data.message || fallbackMessage || 'Status updated', 'success');
+        } catch (error) {
+            showMessage(error.message, 'error');
+        }
+    }
+
+    if (statusBadge) {
+        const initialState = statusBadge.dataset.state || 'draft';
+        updateBadge(initialState);
+        toggleArchiveButton(initialState);
+    }
+
+    if (publishBtn) {
+        publishBtn.addEventListener('click', () => postStateChange(actionUrls.publish, 'published', 'Form published'));
+    }
+
+    if (unpublishBtn) {
+        unpublishBtn.addEventListener('click', () => postStateChange(actionUrls.unpublish, 'draft', 'Form unpublished'));
+    }
+
+    if (archiveBtn) {
+        archiveBtn.addEventListener('click', () => {
+            const isArchived = archiveBtn.dataset.archived === 'true';
+            const url = isArchived ? actionUrls.restore : actionUrls.archive;
+            const nextState = isArchived ? 'draft' : 'archived';
+            const message = isArchived ? 'Form restored' : 'Form archived';
+            postStateChange(url, nextState, message);
+        });
+    }
 });
 </script>
 {% endblock %}

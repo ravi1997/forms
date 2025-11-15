@@ -2,7 +2,7 @@ from flask import render_template, request, jsonify, current_app, send_file, ses
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.responses import bp
-from app.models import User, Form, Response, Answer
+from app.models import User, Form, Response, Answer, UserRoles
 from app.schemas import ResponseSchema
 import csv
 import json
