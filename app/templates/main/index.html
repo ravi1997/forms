@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Dynamic Form Builder{% endblock %}
+
+{% block content %}
+<div class="jumbotron bg-primary text-white p-5 rounded">
+    <div class="container">
+        <h1 class="display-4">Dynamic Form Builder</h1>
+        <p class="lead">Create, share, and analyze forms with our powerful platform.</p>
+        {% if current_user.is_authenticated %}
+            <a class="btn btn-light btn-lg" href="{{ url_for('main.dashboard') }}">Get Started</a>
+        {% else %}
+            <a class="btn btn-light btn-lg" href="{{ url_for('auth.register') }}">Sign Up Free</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if published_forms %}
+<div class="row mt-5">
+    <div class="col-12">
+        <h2>Popular Forms</h2>
+        <div class="row">
+            {% for form in published_forms %}
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ form.title }}</h5>
+                        <p class="card-text">{{ form.description|truncate(100) }}</p>
+                        <a href="{{ url_for('forms.display_form', form_id=form.id) }}" class="btn btn-primary">Fill Form</a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if current_user.is_authenticated and user_forms %}
+<div class="row mt-5">
+    <div class="col-12">
+        <h2>Your Recent Forms</h2>
+        <div class="row">
+            {% for form in user_forms[:3] %}
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ form.title }}</h5>
+                        <p class="card-text">{{ form.description|truncate(100) }}</p>
+                        <a href="{{ url_for('forms.form_builder', form_id=form.id) }}" class="btn btn-outline-primary">Edit</a>
+                        <a href="{{ url_for('responses.list_responses', form_id=form.id) }}" class="btn btn-outline-secondary">Responses</a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

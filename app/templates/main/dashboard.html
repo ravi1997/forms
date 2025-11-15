@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Dynamic Form Builder{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Total Forms</h5>
+                <h2>{{ total_forms }}</h2>
+            </div>
+        </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Published</h5>
+                <h2>{{ published_forms }}</h2>
+            </div>
+        </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Drafts</h5>
+                <h2>{{ draft_forms }}</h2>
+            </div>
+        </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-secondary mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Archived</h5>
+                <h2>{{ archived_forms }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>Recent Forms</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_forms %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for form in recent_forms %}
+                            <tr>
+                                <td>{{ form.title }}</td>
+                                <td>
+                                    {% if form.is_published %}
+                                        <span class="badge bg-success">Published</span>
+                                    {% elif form.is_archived %}
+                                        <span class="badge bg-secondary">Archived</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Draft</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ form.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <a href="{{ url_for('forms.form_builder', form_id=form.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                    <a href="{{ url_for('responses.list_responses', form_id=form.id) }}" class="btn btn-sm btn-outline-secondary">Responses</a>
+                                    <a href="{{ url_for('analytics.form_analytics_page', form_id=form.id) }}" class="btn btn-sm btn-outline-info">Analytics</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p>You haven't created any forms yet. <a href="{{ url_for('forms.list_templates') }}">Get started with a template</a>.</p>
+                {% endif %}
+            </div>
+        </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <a href="{{ url_for('forms.list_templates') }}" class="btn btn-primary w-100 mb-2">Create New Form</a>
+                <a href="{{ url_for('analytics.dashboard') }}" class="btn btn-info w-100 mb-2">View Analytics</a>
+                <a href="{{ url_for('main.profile') }}" class="btn btn-secondary w-100">Manage Profile</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
