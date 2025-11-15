@@ -492,6 +492,75 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to send order update to backend
     function sendOrderUpdate(data) {
         fetch("{{ url_for('forms.update_order', form_id=form.id) }}", {
+    document.getElementById('editQuestionForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const questionText = document.getElementById('editQuestionText').value.trim();
+        const questionType = document.getElementById('editQuestionType').value;
+        const isRequired = document.getElementById('editQuestionRequired').checked;
+
+        if (!questionText || !questionType) {
+            showMessage('Question text and type are required', 'error');
+            return;
+        }
+
+        const data = {
+            question_text: questionText,
+            question_type: questionType,
+            is_required: isRequired,
+            options: [],
+            validation_rules: {}
+        };
+
+        // Handle options if they exist
+        if (document.getElementById('optionsContainer').style.display !== 'none') {
+            const options = [];
+            document.querySelectorAll('#optionsList .option-input').forEach(input => {
+                if (input.value.trim()) {
+                    options.push(input.value.trim());
+                }
+            });
+            data.options = options;
+        }
+
+        // Handle validation rules if they exist
+        if (document.getElementById('validationContainer').style.display !== 'none') {
+            const validationText = document.getElementById('editQuestionValidation').value.trim();
+            if (validationText) {
+                try {
+                    data.validation_rules = JSON.parse(validationText);
+                } catch (e) {
+                    showMessage('Invalid validation rules format', 'error');
+                    return;
+                }
+            }
+        }
+
+        fetch("{{ url_for('forms.update_question', form_id=form.id, section_id='SECTION_PLACEHOLDER', question_id='QUESTION_PLACEHOLDER') }}".replace('SECTION_PLACEHOLDER', currentQuestionSectionId).replace('QUESTION_PLACEHOLDER', currentQuestionId), {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) {
+                const questionElement = document.querySelector(`.question[data-question-id="${currentQuestionId}"]`);
+                questionElement.querySelector('.question-text').value = questionText;
+                questionElement.querySelector('.question-type').textContent = questionType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                questionElement.querySelector('.required-checkbox').checked = isRequired;
+                document.getElementById('editQuestionModal').classList.add('hidden');
+                showMessage(data.message, 'success');
+            } else {
+                showMessage(data.error || 'Failed to update question', 'error');
+            }
+        })
+        .catch(error => {
+            showMessage('Failed to update question', 'error');
+        });
+    });
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
