@@ -154,7 +154,7 @@ class Response(db.Model):
     answers = db.relationship('Answer', backref='response', lazy=True)
     
     # Metadata
-    metadata = db.Column(db.JSON)  # Additional metadata about the response
+    meta = db.Column(db.JSON)  # Additional metadata about the response
     
     def __repr__(self):
         return f'<Response {self.id}>'

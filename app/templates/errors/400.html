@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Bad Request{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-md-6">
+<div class="card">
+<div class="card-body text-center">
+<h1 class="card-title">400</h1>
+<h2 class="card-subtitle mb-3">Bad Request</h2>
+<p class="card-text">The server cannot process the request due to a client error.</p>
+<a href="{{ url_for('main.index') }}" class="btn btn-primary">Go Home</a>
+</div>
+</div>
+</div>
+</div>
+{% endblock %}
