@@ -8,19 +8,19 @@
         <div class="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
             <div class="text-center">
                 <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
-                    <i class="fas fa-check text-green-600 text-xl"></i>
+                    <i class="fas fa-check text-green-600 text-xl" aria-hidden="true"></i>
                 </div>
                 <h2 class="text-2xl font-bold text-gray-900 mb-4">Thank You!</h2>
                 <p class="text-gray-600 mb-2">Your response has been submitted successfully.</p>
                 <p class="text-sm text-gray-500 mb-6">Form: <strong>{{ form.title }}</strong></p>
 
                 <div class="space-y-3">
-                    <a href="{{ url_for('main.index') }}" class="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition duration-150 ease-in-out">
-                        <i class="fas fa-home mr-2"></i>
+                    <a href="{{ url_for('main.index') }}" class="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition duration-150 ease-in-out" aria-label="Go to Homepage">
+                        <i class="fas fa-home mr-2" aria-hidden="true"></i>
                         Go to Homepage
                     </a>
-                    <button onclick="window.history.back()" class="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
-                        <i class="fas fa-arrow-left mr-2"></i>
+                    <button onclick="window.history.back()" class="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out" aria-label="Go back to submit another response">
+                        <i class="fas fa-arrow-left mr-2" aria-hidden="true"></i>
                         Submit Another Response
                     </button>
                 </div>

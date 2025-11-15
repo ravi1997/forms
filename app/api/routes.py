@@ -135,9 +135,11 @@ def get_forms():
     """Get all forms for the current user"""
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
-    
+
     if not user:
         return jsonify({'error': 'user_not_found', 'message': 'User not found'}), 404
+
+    print(f"DEBUG get_forms: user role: {user.role}")
     
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 10, type=int), 100)
@@ -172,10 +174,12 @@ def create_form():
     """Create a new form"""
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
-    
+
     if not user:
         return jsonify({'error': 'user_not_found', 'message': 'User not found'}), 404
-    
+
+    print(f"DEBUG: user role: {user.role}, can_create: {user.can_create_forms()}")
+
     if not user.can_create_forms():
         return jsonify({'error': 'forbidden', 'message': 'You do not have permission to create forms'}), 403
     

@@ -124,7 +124,7 @@
                             {% elif question.question_type == 'file_upload' %}
                             <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
                                 <div class="space-y-1 text-center">
-                                    <i class="fas fa-cloud-upload-alt text-gray-400 text-3xl mb-2"></i>
+                                    <i class="fas fa-cloud-upload-alt text-gray-400 text-3xl mb-2" aria-hidden="true"></i>
                                     <div class="flex text-sm text-gray-600">
                                         <label for="question_{{ question.id }}" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
                                             <span>Upload a file</span>
@@ -146,8 +146,8 @@
             <!-- Submit Button -->
             <div class="bg-white shadow-lg rounded-lg overflow-hidden">
                 <div class="px-6 py-8 sm:px-10 text-center">
-                    <button type="submit" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
-                        <i class="fas fa-paper-plane mr-2"></i>
+                    <button type="submit" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out" aria-label="Submit the form">
+                        <i class="fas fa-paper-plane mr-2" aria-hidden="true"></i>
                         Submit Form
                     </button>
                 </div>
