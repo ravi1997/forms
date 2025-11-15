@@ -232,6 +232,10 @@
                     <div id="optionsList"></div>
                     <button type="button" id="addOption" class="mt-2 text-blue-600 hover:text-blue-800 text-sm">+ Add Option</button>
                 </div>
+                <div class="mb-4" id="validationContainer" style="display: none;">
+                    <label for="editQuestionValidation" class="block text-sm font-medium text-gray-700">Validation Rules</label>
+                    <textarea id="editQuestionValidation" rows="2" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="JSON format: {&#34;min_length&#34;: 5, &#34;max_length&#34;: 100}"></textarea>
+                </div>
                 <div class="flex justify-end space-x-3">
                     <button type="button" id="cancelEditQuestion" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Save</button>
