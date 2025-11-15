@@ -452,6 +452,21 @@ document.addEventListener('DOMContentLoaded', function() {
             if (sectionId) {
                 orders.push({ id: parseInt(sectionId), order: index });
             }
+    function toggleOptionsContainer(questionType) {
+        const container = document.getElementById('optionsContainer');
+        const validationContainer = document.getElementById('validationContainer');
+        if (['multiple_choice', 'checkbox', 'select'].includes(questionType)) {
+            container.style.display = 'block';
+            validationContainer.style.display = 'none';
+        } else {
+            container.style.display = 'none';
+            if (['text', 'textarea', 'email', 'number'].includes(questionType)) {
+                validationContainer.style.display = 'block';
+            } else {
+                validationContainer.style.display = 'none';
+            }
+        }
+    }
         });
         if (orders.length > 0) {
             sendOrderUpdate({ sections: orders });
