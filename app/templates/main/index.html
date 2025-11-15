@@ -3,56 +3,120 @@
 {% block title %}Home - Dynamic Form Builder{% endblock %}
 
 {% block content %}
-<div class="jumbotron bg-primary text-white p-5 rounded">
-    <div class="container">
-        <h1 class="display-4">Dynamic Form Builder</h1>
-        <p class="lead">Create, share, and analyze forms with our powerful platform.</p>
-        {% if current_user.is_authenticated %}
-            <a class="btn btn-light btn-lg" href="{{ url_for('main.dashboard') }}">Get Started</a>
-        {% else %}
-            <a class="btn btn-light btn-lg" href="{{ url_for('auth.register') }}">Sign Up Free</a>
-        {% endif %}
+<!-- Hero Section -->
+<div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <div class="text-center">
+            <h1 class="text-5xl font-bold mb-6">Dynamic Form Builder</h1>
+            <p class="text-xl mb-8 max-w-2xl mx-auto">Create, share, and analyze forms with our powerful platform. Build beautiful forms in minutes.</p>
+            {% if current_user %}
+                <a href="{{ url_for('main.dashboard') }}"
+                   class="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-blue-600 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                    <i class="fas fa-rocket mr-2"></i>
+                    Get Started
+                </a>
+            {% else %}
+                <a href="{{ url_for('auth.register') }}"
+                   class="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-blue-600 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                    <i class="fas fa-user-plus mr-2"></i>
+                    Sign Up Free
+                </a>
+            {% endif %}
+        </div>
     </div>
 </div>
 
+<!-- Popular Forms Section -->
 {% if published_forms %}
-<div class="row mt-5">
-    <div class="col-12">
-        <h2>Popular Forms</h2>
-        <div class="row">
+<div class="py-16 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl font-bold text-gray-900">Popular Forms</h2>
+            <p class="mt-4 text-lg text-gray-600">Check out these trending forms</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {% for form in published_forms %}
-            <div class="col-md-4 mb-4">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ form.title }}</h5>
-                        <p class="card-text">{{ form.description|truncate(100) }}</p>
-                        <a href="{{ url_for('forms.display_form', form_id=form.id) }}" class="btn btn-primary">Fill Form</a>
-                    </div>
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition duration-300 ease-in-out">
+                <div class="p-6">
+                    <h3 class="text-xl font-semibold text-gray-900 mb-2">{{ form.title }}</h3>
+                    <p class="text-gray-600 mb-4">{{ form.description|truncate(100) }}</p>
+                    <a href="{{ url_for('forms.display_form', form_id=form.id) }}"
+                       class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition duration-150 ease-in-out">
+                        <i class="fas fa-edit mr-2"></i>
+                        Fill Form
+                    </a>
                 </div>
+            </div>
             {% endfor %}
         </div>
     </div>
 </div>
 {% endif %}
 
-{% if current_user.is_authenticated and user_forms %}
-<div class="row mt-5">
-    <div class="col-12">
-        <h2>Your Recent Forms</h2>
-        <div class="row">
+<!-- User Forms Section -->
+{% if current_user and user_forms %}
+<div class="py-16 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl font-bold text-gray-900">Your Recent Forms</h2>
+            <p class="mt-4 text-lg text-gray-600">Continue working on your forms</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {% for form in user_forms[:3] %}
-            <div class="col-md-4 mb-4">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ form.title }}</h5>
-                        <p class="card-text">{{ form.description|truncate(100) }}</p>
-                        <a href="{{ url_for('forms.form_builder', form_id=form.id) }}" class="btn btn-outline-primary">Edit</a>
-                        <a href="{{ url_for('responses.list_responses', form_id=form.id) }}" class="btn btn-outline-secondary">Responses</a>
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition duration-300 ease-in-out border border-gray-200">
+                <div class="p-6">
+                    <h3 class="text-xl font-semibold text-gray-900 mb-2">{{ form.title }}</h3>
+                    <p class="text-gray-600 mb-4">{{ form.description|truncate(100) }}</p>
+                    <div class="flex space-x-2">
+                        <a href="{{ url_for('forms.form_builder', form_id=form.id) }}"
+                           class="inline-flex items-center px-3 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-600 bg-white hover:bg-blue-50 transition duration-150 ease-in-out">
+                            <i class="fas fa-edit mr-1"></i>
+                            Edit
+                        </a>
+                        <a href="{{ url_for('responses.list_responses', form_id=form.id) }}"
+                           class="inline-flex items-center px-3 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-600 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                            <i class="fas fa-chart-bar mr-1"></i>
+                            Responses
+                        </a>
                     </div>
                 </div>
+            </div>
             {% endfor %}
         </div>
     </div>
 </div>
 {% endif %}
+
+<!-- Features Section -->
+<div class="py-16 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl font-bold text-gray-900">Why Choose Form Builder?</h2>
+            <p class="mt-4 text-lg text-gray-600">Everything you need to create amazing forms</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="text-center">
+                <div class="mx-auto h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-magic text-2xl text-blue-600"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">Easy to Use</h3>
+                <p class="text-gray-600">Create beautiful forms with our intuitive drag-and-drop builder.</p>
+            </div>
+            <div class="text-center">
+                <div class="mx-auto h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-chart-line text-2xl text-green-600"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">Powerful Analytics</h3>
+                <p class="text-gray-600">Get detailed insights and analytics on your form responses.</p>
+            </div>
+            <div class="text-center">
+                <div class="mx-auto h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-share-alt text-2xl text-purple-600"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">Easy Sharing</h3>
+                <p class="text-gray-600">Share your forms with a simple link, no signup required.</p>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

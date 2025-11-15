@@ -124,26 +124,41 @@ def form_submitted(form_id):
     return render_template('forms/submitted.html', form=form)
 
 @bp.route('/<int:form_id>/builder', methods=['GET'])
-@jwt_required()
 def form_builder(form_id):
     """Display form builder interface"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to access form builder', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     form = Form.query.get_or_404(form_id)
-    
+
     # Check if user has permission to edit this form
     if form.created_by != current_user_id:
-        return jsonify({'error': 'forbidden', 'message': 'You do not have permission to edit this form'}), 403
-    
+        if request.is_json:
+            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to edit this form'}), 403
+        else:
+            from flask import flash, redirect, url_for
+            flash('You do not have permission to edit this form', 'error')
+            return redirect(url_for('main.dashboard'))
+
     # Get existing sections and questions
     sections = Section.query.filter_by(form_id=form_id).order_by(Section.order).all()
     for section in sections:
         section.questions = Question.query.filter_by(section_id=section.id).order_by(Question.order).all()
-    
+
     # Get available question templates
     question_templates = QuestionLibrary.query.filter(
         (QuestionLibrary.created_by == current_user_id) | (QuestionLibrary.is_public == True)
     ).all()
-    
+
     return render_template('forms/builder.html', form=form, sections=sections, question_templates=question_templates)
 
 @bp.route('/<int:form_id>/update_structure', methods=['POST'])
@@ -202,33 +217,62 @@ def update_form_structure(form_id):
         return jsonify({'error': 'update_failed', 'message': 'Failed to update form structure'}), 500
 
 @bp.route('/templates', methods=['GET'])
-@jwt_required()
 def list_templates():
     """List available form templates"""
-    current_user_id = get_jwt_identity()
-    
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to access templates', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     # Get all public templates and templates created by this user
     templates = FormTemplate.query.filter(
         (FormTemplate.is_public == True) | (FormTemplate.created_by == current_user_id)
     ).all()
-    
+
     return render_template('forms/templates.html', templates=templates)
 
 @bp.route('/create_from_template/<int:template_id>', methods=['GET'])
-@jwt_required()
 def create_from_template(template_id):
     """Create a new form from a template"""
-    current_user_id = get_jwt_identity()
+    # Try JWT first (API)
+    try:
+        current_user_id = get_jwt_identity()
+    except:
+        # Check session (web)
+        if 'user' not in session:
+            from flask import flash, redirect, url_for
+            flash('Please login to create forms', 'error')
+            return redirect(url_for('auth.login'))
+        user_data = session['user']
+        current_user_id = user_data['id']
+
     user = User.query.get_or_404(current_user_id)
-    
+
     if not user.can_create_forms():
-        return jsonify({'error': 'forbidden', 'message': 'You do not have permission to create forms'}), 403
-    
+        if request.is_json:
+            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to create forms'}), 403
+        else:
+            from flask import flash, redirect, url_for
+            flash('You do not have permission to create forms', 'error')
+            return redirect(url_for('main.dashboard'))
+
     template = FormTemplate.query.get_or_404(template_id)
-    
+
     # Check if user has access to this template
     if not template.is_public and template.created_by != current_user_id:
-        return jsonify({'error': 'forbidden', 'message': 'You do not have access to this template'}), 403
+        if request.is_json:
+            return jsonify({'error': 'forbidden', 'message': 'You do not have access to this template'}), 403
+        else:
+            from flask import flash, redirect, url_for
+            flash('You do not have access to this template', 'error')
+            return redirect(url_for('forms.list_templates'))
     
     # Create new form from template
     form = Form(
