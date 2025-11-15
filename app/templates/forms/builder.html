@@ -70,7 +70,57 @@
 
                         <!-- Sections Container -->
                         <div id="sectionsContainer" class="space-y-6">
-                            <!-- Sections will be dynamically added here -->
+                            {% for section in sections %}
+                            <div class="section bg-gray-50 border border-gray-200 rounded-lg p-4" data-section-id="{{ section.id }}">
+                                <div class="flex items-center justify-between mb-4">
+                                    <input type="text" class="section-title flex-1 text-lg font-medium bg-transparent border-none focus:outline-none focus:ring-0" value="{{ section.title }}">
+                                    <div class="flex space-x-2">
+                                        <button class="edit-section text-blue-600 hover:text-blue-800" title="Edit Section">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="delete-section text-red-600 hover:text-red-800" title="Delete Section">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <textarea class="section-description w-full p-2 border border-gray-300 rounded-md mb-4">{{ section.description or '' }}</textarea>
+
+                                <div class="questions-container space-y-3">
+                                    {% for question in section.questions %}
+                                    <div class="question bg-white border border-gray-200 rounded-lg p-4" data-question-id="{{ question.id }}">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <div class="flex items-center space-x-2">
+                                                <span class="question-type text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">{{ question.question_type.value|replace('_', ' ')|title }}</span>
+                                                <label class="flex items-center">
+                                                    <input type="checkbox" class="required-checkbox mr-1" {% if question.is_required %}checked{% endif %}>
+                                                    <span class="text-sm text-gray-600">Required</span>
+                                                </label>
+                                            </div>
+                                            <div class="flex space-x-2">
+                                                <button class="edit-question text-blue-600 hover:text-blue-800" title="Edit Question">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="delete-question text-red-600 hover:text-red-800" title="Delete Question">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <input type="text" class="question-text w-full p-2 border border-gray-300 rounded-md mb-3 font-medium" value="{{ question.question_text }}">
+
+                                        <div class="question-options">
+                                            <!-- Options will be added here for multiple choice, checkbox, etc. -->
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+
+                                <button class="add-question mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition duration-150 ease-in-out">
+                                    <i class="fas fa-plus mr-2"></i>
+                                    Add Question
+                                </button>
+                            </div>
+                            {% endfor %}
                         </div>
 
                         <!-- Add Section Button -->
@@ -124,6 +174,72 @@
                             <i class="fas {% if form.is_archived %}fa-box-open{% else %}fa-archive{% endif %} mr-2"></i>
                             {% if form.is_archived %}Restore Form{% else %}Archive Form{% endif %}
                         </button>
+<!-- Edit Section Modal -->
+<div id="editSectionModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Section</h3>
+            <form id="editSectionForm">
+                <div class="mb-4">
+                    <label for="editSectionTitle" class="block text-sm font-medium text-gray-700">Title</label>
+                    <input type="text" id="editSectionTitle" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label for="editSectionDescription" class="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea id="editSectionDescription" rows="3" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancelEditSection" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Question Modal -->
+<div id="editQuestionModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Question</h3>
+            <form id="editQuestionForm">
+                <div class="mb-4">
+                    <label for="editQuestionText" class="block text-sm font-medium text-gray-700">Question Text</label>
+                    <input type="text" id="editQuestionText" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label for="editQuestionType" class="block text-sm font-medium text-gray-700">Question Type</label>
+                    <select id="editQuestionType" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="text">Text</option>
+                        <option value="textarea">Textarea</option>
+                        <option value="multiple_choice">Multiple Choice</option>
+                        <option value="checkbox">Checkbox</option>
+                        <option value="select">Select</option>
+                        <option value="email">Email</option>
+                        <option value="number">Number</option>
+                        <option value="date">Date</option>
+                        <option value="file_upload">File Upload</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="editQuestionRequired" class="mr-2">
+                        <span class="text-sm text-gray-700">Required</span>
+                    </label>
+                </div>
+                <div class="mb-4" id="optionsContainer" style="display: none;">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Options</label>
+                    <div id="optionsList"></div>
+                    <button type="button" id="addOption" class="mt-2 text-blue-600 hover:text-blue-800 text-sm">+ Add Option</button>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancelEditQuestion" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
                         <a href="{{ url_for('responses.list_responses', form_id=form.id) }}" class="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
                             <i class="fas fa-chart-bar mr-2"></i>
                             View Responses
@@ -140,9 +256,14 @@
     <div class="section bg-gray-50 border border-gray-200 rounded-lg p-4">
         <div class="flex items-center justify-between mb-4">
             <input type="text" class="section-title flex-1 text-lg font-medium bg-transparent border-none focus:outline-none focus:ring-0" placeholder="Section Title">
-            <button class="delete-section text-red-600 hover:text-red-800 ml-2">
-                <i class="fas fa-trash"></i>
-            </button>
+            <div class="flex space-x-2">
+                <button class="edit-section text-blue-600 hover:text-blue-800" title="Edit Section">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="delete-section text-red-600 hover:text-red-800" title="Delete Section">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
         </div>
         <textarea class="section-description w-full p-2 border border-gray-300 rounded-md mb-4" placeholder="Section description (optional)"></textarea>
 
@@ -168,9 +289,14 @@
                     <span class="text-sm text-gray-600">Required</span>
                 </label>
             </div>
-            <button class="delete-question text-red-600 hover:text-red-800">
-                <i class="fas fa-trash"></i>
-            </button>
+            <div class="flex space-x-2">
+                <button class="edit-question text-blue-600 hover:text-blue-800" title="Edit Question">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="delete-question text-red-600 hover:text-red-800" title="Delete Question">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
         </div>
 
         <input type="text" class="question-text w-full p-2 border border-gray-300 rounded-md mb-3 font-medium" placeholder="Enter your question">
@@ -181,6 +307,7 @@
     </div>
 </template>
 
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const statusBadge = document.getElementById('formStateBadge');
@@ -285,6 +412,90 @@ document.addEventListener('DOMContentLoaded', function() {
             postStateChange(url, nextState, message);
         });
     }
+
+    // Initialize sortable for sections
+    const sectionsContainer = document.getElementById('sectionsContainer');
+    if (sectionsContainer) {
+        new Sortable(sectionsContainer, {
+            handle: '.section', // Drag by the section itself
+            animation: 150,
+            onEnd: function(evt) {
+                updateSectionOrders();
+            }
+        });
+    }
+
+    // Function to initialize sortable for questions in a section
+    function initializeQuestionSortable(sectionElement) {
+        const questionsContainer = sectionElement.querySelector('.questions-container');
+        if (questionsContainer) {
+            new Sortable(questionsContainer, {
+                handle: '.question', // Drag by the question itself
+                animation: 150,
+                onEnd: function(evt) {
+                    updateQuestionOrders(sectionElement);
+                }
+            });
+        }
+    }
+
+    // Function to update section orders
+    function updateSectionOrders() {
+        const sections = document.querySelectorAll('#sectionsContainer .section');
+        const orders = [];
+        sections.forEach((section, index) => {
+            const sectionId = section.dataset.sectionId;
+            if (sectionId) {
+                orders.push({ id: parseInt(sectionId), order: index });
+            }
+        });
+        if (orders.length > 0) {
+            sendOrderUpdate({ sections: orders });
+        }
+    }
+
+    // Function to update question orders within a section
+    function updateQuestionOrders(sectionElement) {
+        const sectionId = sectionElement.dataset.sectionId;
+        const questions = sectionElement.querySelectorAll('.question');
+        const orders = [];
+        questions.forEach((question, index) => {
+            const questionId = question.dataset.questionId;
+            if (questionId) {
+                orders.push({ id: parseInt(questionId), order: index });
+            }
+        });
+        if (orders.length > 0) {
+            sendOrderUpdate({ questions: orders });
+        }
+    }
+
+    // Function to send order update to backend
+    function sendOrderUpdate(data) {
+        fetch("{{ url_for('forms.update_order', form_id=form.id) }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                console.error('Failed to update order:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error updating order:', error);
+        });
+    }
+
+    // Initialize sortable for existing sections
+    document.querySelectorAll('#sectionsContainer .section').forEach(section => {
+        initializeQuestionSortable(section);
+    });
 });
 </script>
 {% endblock %}

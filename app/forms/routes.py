@@ -773,6 +773,49 @@ def delete_question_library(question_id):
     flash(message, 'success')
     return redirect(url_for('forms.question_library'))
 
+@bp.route('/<int:form_id>/update_order', methods=['POST'])
+def update_order(form_id):
+    """Update the order of sections and questions"""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to update order')
+
+    form = Form.query.get_or_404(form_id)
+    if form.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to edit this form')
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': 'No data provided'}), 400
+
+    try:
+        # Update section orders
+        if 'sections' in data:
+            for section_data in data['sections']:
+                section_id = section_data.get('id')
+                order = section_data.get('order')
+                if section_id is not None and order is not None:
+                    section = Section.query.filter_by(id=section_id, form_id=form_id).first()
+                    if section:
+                        section.order = order
+
+        # Update question orders
+        if 'questions' in data:
+            for question_data in data['questions']:
+                question_id = question_data.get('id')
+                order = question_data.get('order')
+                if question_id is not None and order is not None:
+                    question = Question.query.filter_by(id=question_id).join(Section).filter(Section.form_id == form_id).first()
+                    if question:
+                        question.order = order
+
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Order updated successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error updating order: {str(e)}")
+        return jsonify({'success': False, 'message': 'Failed to update order'}), 500
+
 @bp.route('/create', methods=['GET', 'POST'])
 def create_form():
     """Create a new form"""
@@ -819,4 +862,229 @@ def create_form():
     db.session.commit()
 
     # Redirect to form builder
+@bp.route('/<int:form_id>/update_metadata', methods=['POST'])
+def update_form_metadata(form_id):
+    """Update form title and description via AJAX"""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to update forms')
+
+    form = Form.query.get_or_404(form_id)
+    if form.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to edit this form')
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    title = data.get('title', '').strip()
+    description = data.get('description', '').strip()
+
+    if not title:
+        return jsonify({'error': 'Title is required'}), 400
+
+    form.title = title
+    form.description = description
+    form.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({'message': 'Form metadata updated successfully'}), 200
+
+@bp.route('/<int:form_id>/sections', methods=['POST'])
+def add_section(form_id):
+    """Add a new section to the form"""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to add sections')
+
+    form = Form.query.get_or_404(form_id)
+    if form.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to edit this form')
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    title = data.get('title', '').strip()
+    description = data.get('description', '').strip()
+
+    # Get the next order
+    max_order = db.session.query(db.func.max(Section.order)).filter_by(form_id=form_id).scalar() or 0
+    order = max_order + 1
+
+    section = Section(
+        title=title,
+        description=description,
+        form_id=form_id,
+        order=order
+    )
+    db.session.add(section)
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Section added successfully',
+        'section': {
+            'id': section.id,
+            'title': section.title,
+            'description': section.description,
+            'order': section.order
+        }
+    }), 201
+
+@bp.route('/<int:form_id>/sections/<int:section_id>', methods=['PUT'])
+def update_section(form_id, section_id):
+    """Update a section"""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to update sections')
+
+    form = Form.query.get_or_404(form_id)
+    if form.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to edit this form')
+
+    section = Section.query.filter_by(id=section_id, form_id=form_id).first_or_404()
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    title = data.get('title', '').strip()
+    description = data.get('description', '').strip()
+
+    section.title = title
+    section.description = description
+    section.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({'message': 'Section updated successfully'}), 200
+
+@bp.route('/<int:form_id>/sections/<int:section_id>', methods=['DELETE'])
+def delete_section(form_id, section_id):
+    """Delete a section"""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to delete sections')
+
+    form = Form.query.get_or_404(form_id)
+    if form.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to edit this form')
+
+    section = Section.query.filter_by(id=section_id, form_id=form_id).first_or_404()
+
+    # Delete all questions in the section first
+    Question.query.filter_by(section_id=section_id).delete()
+
+    db.session.delete(section)
+    db.session.commit()
+
+    return jsonify({'message': 'Section deleted successfully'}), 200
+
+@bp.route('/<int:form_id>/sections/<int:section_id>/questions', methods=['POST'])
+def add_question(form_id, section_id):
+    """Add a new question to a section"""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to add questions')
+
+    form = Form.query.get_or_404(form_id)
+    if form.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to edit this form')
+
+    section = Section.query.filter_by(id=section_id, form_id=form_id).first_or_404()
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    question_text = data.get('question_text', '').strip()
+    question_type = data.get('question_type')
+    is_required = data.get('is_required', False)
+    options = data.get('options', [])
+    validation_rules = data.get('validation_rules', {})
+
+    if not question_text or not question_type:
+        return jsonify({'error': 'Question text and type are required'}), 400
+
+    # Get the next order
+    max_order = db.session.query(db.func.max(Question.order)).filter_by(section_id=section_id).scalar() or 0
+    order = max_order + 1
+
+    question = Question(
+        section_id=section_id,
+        question_text=question_text,
+        question_type=question_type,
+        is_required=is_required,
+        order=order,
+        options=options,
+        validation_rules=validation_rules
+    )
+    db.session.add(question)
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Question added successfully',
+        'question': {
+            'id': question.id,
+            'question_text': question.question_text,
+            'question_type': question.question_type.value if hasattr(question.question_type, 'value') else question.question_type,
+            'is_required': question.is_required,
+            'order': question.order,
+            'options': question.options or [],
+            'validation_rules': question.validation_rules or {}
+        }
+    }), 201
+
+@bp.route('/<int:form_id>/sections/<int:section_id>/questions/<int:question_id>', methods=['PUT'])
+def update_question(form_id, section_id, question_id):
+    """Update a question"""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to update questions')
+
+    form = Form.query.get_or_404(form_id)
+    if form.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to edit this form')
+
+    question = Question.query.filter_by(id=question_id, section_id=section_id).join(Section).filter(Section.form_id == form_id).first_or_404()
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    question_text = data.get('question_text', '').strip()
+    question_type = data.get('question_type')
+    is_required = data.get('is_required', False)
+    options = data.get('options', [])
+    validation_rules = data.get('validation_rules', {})
+
+    if not question_text or not question_type:
+        return jsonify({'error': 'Question text and type are required'}), 400
+
+    question.question_text = question_text
+    question.question_type = question_type
+    question.is_required = is_required
+    question.options = options
+    question.validation_rules = validation_rules
+    question.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({'message': 'Question updated successfully'}), 200
+
+@bp.route('/<int:form_id>/sections/<int:section_id>/questions/<int:question_id>', methods=['DELETE'])
+def delete_question(form_id, section_id, question_id):
+    """Delete a question"""
+    current_user_id = _get_current_user_id()
+    if not current_user_id:
+        return _login_required_response('Please login to delete questions')
+
+    form = Form.query.get_or_404(form_id)
+    if form.created_by != current_user_id:
+        return _permission_denied_response('You do not have permission to edit this form')
+
+    question = Question.query.filter_by(id=question_id, section_id=section_id).join(Section).filter(Section.form_id == form_id).first_or_404()
+
+    db.session.delete(question)
+    db.session.commit()
+
+    return jsonify({'message': 'Question deleted successfully'}), 200
     return redirect(url_for('forms.form_builder', form_id=form.id))
