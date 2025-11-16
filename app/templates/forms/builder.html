@@ -1,0 +1,980 @@
+{% extends "base.html" %}
+
+{% block title %}Form Builder - {{ form.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Custom styles for form builder */
+.builder-container {
+    min-height: 100vh;
+    background-color: #f8fafc;
+}
+
+.sidebar {
+    background: white;
+    border-right: 1px solid #e2e8f0;
+    min-height: calc(100vh - 64px);
+}
+
+.question-type-card {
+    transition: all 0.2s ease;
+    cursor: grab;
+}
+
+.question-type-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.question-type-card:active {
+    cursor: grabbing;
+}
+
+.form-canvas {
+    background: white;
+    min-height: calc(100vh - 64px);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.section-card {
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    transition: border-color 0.2s ease;
+}
+
+.section-card:hover {
+    border-color: #3b82f6;
+}
+
+.question-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    padding: 1rem;
+    transition: all 0.2s ease;
+}
+
+.question-item:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.drag-handle {
+    cursor: grab;
+    color: #9ca3af;
+}
+
+.drag-handle:hover {
+    color: #6b7280;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.question-type-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.badge-text { background-color: #dbeafe; color: #1e40af; }
+.badge-textarea { background-color: #dcfce7; color: #166534; }
+.badge-select { background-color: #fef3c7; color: #92400e; }
+.badge-radio { background-color: #fce7f3; color: #be185d; }
+.badge-checkbox { background-color: #e0e7ff; color: #3730a3; }
+.badge-file { background-color: #fed7d7; color: #dc2626; }
+.badge-date { background-color: #d1fae5; color: #065f46; }
+.badge-number { background-color: #dbeafe; color: #1e40af; }
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        top: 64px;
+        left: -100%;
+        width: 280px;
+        z-index: 1000;
+        transition: left 0.3s ease;
+    }
+
+    .sidebar.open {
+        left: 0;
+    }
+
+    .mobile-menu-toggle {
+        display: block;
+    }
+}
+
+@media (min-width: 769px) {
+    .mobile-menu-toggle {
+        display: none;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="builder-container">
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Builder Header -->
+    <div class="bg-white border-b border-gray-200 px-4 py-4 sm:px-6 lg:px-8">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center space-x-4">
+                <button id="mobile-menu-toggle" class="mobile-menu-toggle md:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" aria-label="Open sidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">{{ form.title }}</h1>
+                    <p class="text-sm text-gray-500 mt-1">{{ form.description or 'No description' }}</p>
+                </div>
+            </div>
+            <div class="mt-4 sm:mt-0 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+                <a href="{{ url_for('forms.preview', form_id=form.id) }}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" aria-label="Preview form">
+                    <i class="fas fa-eye mr-2"></i>
+                    Preview
+                </a>
+                <a href="{{ url_for('forms.edit_form', form_id=form.id) }}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" aria-label="Edit form settings">
+                    <i class="fas fa-cog mr-2"></i>
+                    Settings
+                </a>
+                {% if not form.is_published %}
+                <button id="publish-btn" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" aria-label="Publish form">
+                    <i class="fas fa-globe mr-2"></i>
+                    Publish
+                </button>
+                {% else %}
+                <button id="unpublish-btn" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500" aria-label="Unpublish form">
+                    <i class="fas fa-eye-slash mr-2"></i>
+                    Unpublish
+                </button>
+                {% endif %}
+                <a href="{{ url_for('forms.my_forms') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" aria-label="Back to my forms">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    My Forms
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex">
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar w-80">
+            <div class="p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Form Elements</h2>
+
+                <!-- Question Types -->
+                <div class="space-y-3">
+                    <div class="question-type-card bg-white p-3 rounded-lg border border-gray-200" data-type="text">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-font text-blue-500"></i>
+                            <div>
+                                <h3 class="font-medium text-gray-900">Text Input</h3>
+                                <p class="text-sm text-gray-500">Single line text field</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="question-type-card bg-white p-3 rounded-lg border border-gray-200" data-type="textarea">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-align-left text-green-500"></i>
+                            <div>
+                                <h3 class="font-medium text-gray-900">Text Area</h3>
+                                <p class="text-sm text-gray-500">Multi-line text field</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="question-type-card bg-white p-3 rounded-lg border border-gray-200" data-type="select">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-list text-yellow-500"></i>
+                            <div>
+                                <h3 class="font-medium text-gray-900">Dropdown</h3>
+                                <p class="text-sm text-gray-500">Single choice from list</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="question-type-card bg-white p-3 rounded-lg border border-gray-200" data-type="radio">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-dot-circle text-pink-500"></i>
+                            <div>
+                                <h3 class="font-medium text-gray-900">Radio Buttons</h3>
+                                <p class="text-sm text-gray-500">Single choice selection</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="question-type-card bg-white p-3 rounded-lg border border-gray-200" data-type="checkbox">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-check-square text-purple-500"></i>
+                            <div>
+                                <h3 class="font-medium text-gray-900">Checkboxes</h3>
+                                <p class="text-sm text-gray-500">Multiple choice selection</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="question-type-card bg-white p-3 rounded-lg border border-gray-200" data-type="file_upload">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-upload text-red-500"></i>
+                            <div>
+                                <h3 class="font-medium text-gray-900">File Upload</h3>
+                                <p class="text-sm text-gray-500">Allow file attachments</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="question-type-card bg-white p-3 rounded-lg border border-gray-200" data-type="date">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-calendar text-teal-500"></i>
+                            <div>
+                                <h3 class="font-medium text-gray-900">Date Picker</h3>
+                                <p class="text-sm text-gray-500">Date selection field</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="question-type-card bg-white p-3 rounded-lg border border-gray-200" data-type="number">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-hashtag text-blue-500"></i>
+                            <div>
+                                <h3 class="font-medium text-gray-900">Number Input</h3>
+                                <p class="text-sm text-gray-500">Numeric value field</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question Library -->
+                {% if question_templates %}
+                <div class="mt-8">
+                    <h3 class="text-md font-semibold text-gray-900 mb-3">Question Library</h3>
+                    <div class="space-y-2">
+                        {% for template in question_templates %}
+                        <div class="question-type-card bg-gray-50 p-3 rounded-lg border border-gray-200" data-template-id="{{ template.id }}">
+                            <div class="flex items-start space-x-3">
+                                <i class="fas fa-bookmark text-indigo-500 mt-1"></i>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 text-sm">{{ template.question_text[:50] }}{% if template.question_text|length > 50 %}...{% endif %}</h4>
+                                    <span class="question-type-badge badge-{{ template.question_type|lower }}">{{ template.question_type|replace('_', ' ')|title }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 p-6">
+            <div class="form-canvas p-6">
+                <div id="form-structure" class="space-y-6">
+                    <!-- Form sections will be rendered here -->
+                    {% for section in sections %}
+                    <div class="section-card p-6" data-section-id="{{ section.id }}">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-grip-vertical drag-handle text-gray-400"></i>
+                                <h3 class="text-xl font-semibold text-gray-900 section-title">{{ section.title or 'Untitled Section' }}</h3>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button class="edit-section-btn p-2 text-gray-400 hover:text-gray-600" aria-label="Edit section">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="delete-section-btn p-2 text-gray-400 hover:text-red-600" aria-label="Delete section">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        {% if section.description %}
+                        <p class="text-gray-600 mb-6 section-description">{{ section.description }}</p>
+                        {% endif %}
+
+                        <div class="questions-container space-y-4">
+                            {% for question in section.questions %}
+                            <div class="question-item" data-question-id="{{ question.id }}">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex items-start space-x-3 flex-1">
+                                        <i class="fas fa-grip-vertical drag-handle text-gray-400 mt-1"></i>
+                                        <div class="flex-1">
+                                            <div class="flex items-center space-x-2 mb-2">
+                                                <h4 class="font-medium text-gray-900 question-text">{{ question.question_text }}</h4>
+                                                {% if question.is_required %}
+                                                <span class="text-red-500">*</span>
+                                                {% endif %}
+                                                <span class="question-type-badge badge-{{ question.question_type|lower }}">{{ question.question_type|replace('_', ' ')|title }}</span>
+                                            </div>
+
+                                            <!-- Question preview based on type -->
+                                            <div class="question-preview mt-2">
+                                                {% if question.question_type == 'text' %}
+                                                <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" placeholder="Text answer" disabled>
+                                                {% elif question.question_type == 'textarea' %}
+                                                <textarea class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" rows="3" placeholder="Long text answer" disabled></textarea>
+                                                {% elif question.question_type == 'select' %}
+                                                <select class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" disabled>
+                                                    <option>Select an option</option>
+                                                    {% for option in question.options %}
+                                                    <option>{{ option }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                                {% elif question.question_type == 'radio' %}
+                                                <div class="space-y-2">
+                                                    {% for option in question.options %}
+                                                    <label class="flex items-center space-x-2">
+                                                        <input type="radio" name="question_{{ question.id }}" disabled>
+                                                        <span>{{ option }}</span>
+                                                    </label>
+                                                    {% endfor %}
+                                                </div>
+                                                {% elif question.question_type == 'checkbox' %}
+                                                <div class="space-y-2">
+                                                    {% for option in question.options %}
+                                                    <label class="flex items-center space-x-2">
+                                                        <input type="checkbox" disabled>
+                                                        <span>{{ option }}</span>
+                                                    </label>
+                                                    {% endfor %}
+                                                </div>
+                                                {% elif question.question_type == 'file_upload' %}
+                                                <div class="border-2 border-dashed border-gray-300 rounded-md p-4 text-center bg-gray-50">
+                                                    <i class="fas fa-upload text-gray-400 text-2xl mb-2"></i>
+                                                    <p class="text-gray-500">File upload area</p>
+                                                </div>
+                                                {% elif question.question_type == 'date' %}
+                                                <input type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" disabled>
+                                                {% elif question.question_type == 'number' %}
+                                                <input type="number" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" placeholder="Numeric answer" disabled>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <button class="edit-question-btn p-2 text-gray-400 hover:text-gray-600" aria-label="Edit question">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="delete-question-btn p-2 text-gray-400 hover:text-red-600" aria-label="Delete question">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Add question button -->
+                        <div class="mt-6 text-center">
+                            <button class="add-question-btn inline-flex items-center px-4 py-2 border border-dashed border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" aria-label="Add question to section">
+                                <i class="fas fa-plus mr-2"></i>
+                                Add Question
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Add section button -->
+                <div class="mt-8 text-center">
+                    <button id="add-section-btn" class="inline-flex items-center px-6 py-3 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" aria-label="Add new section">
+                        <i class="fas fa-plus mr-2"></i>
+                        Add Section
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modals -->
+<!-- Section Edit Modal -->
+<div id="section-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg font-medium text-gray-900 mb-4" id="section-modal-title">Edit Section</h3>
+            <form id="section-form">
+                <input type="hidden" id="section-id" name="section_id">
+                <div class="mb-4">
+                    <label for="section-title" class="block text-sm font-medium text-gray-700">Section Title</label>
+                    <input type="text" id="section-title" name="title" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label for="section-description" class="block text-sm font-medium text-gray-700">Description (Optional)</label>
+                    <textarea id="section-description" name="description" rows="3" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-section-btn" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Cancel</button>
+                    <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Question Edit Modal -->
+<div id="question-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white max-h-96 overflow-y-auto">
+        <div class="mt-3">
+            <h3 class="text-lg font-medium text-gray-900 mb-4" id="question-modal-title">Edit Question</h3>
+            <form id="question-form">
+                <input type="hidden" id="question-id" name="question_id">
+                <input type="hidden" id="section-id-for-question" name="section_id">
+                <div class="mb-4">
+                    <label for="question-text" class="block text-sm font-medium text-gray-700">Question Text</label>
+                    <input type="text" id="question-text" name="question_text" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label for="question-type" class="block text-sm font-medium text-gray-700">Question Type</label>
+                    <select id="question-type" name="question_type" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                        <option value="text">Text Input</option>
+                        <option value="textarea">Text Area</option>
+                        <option value="select">Dropdown</option>
+                        <option value="radio">Radio Buttons</option>
+                        <option value="checkbox">Checkboxes</option>
+                        <option value="file_upload">File Upload</option>
+                        <option value="date">Date Picker</option>
+                        <option value="number">Number Input</option>
+                    </select>
+                </div>
+                <div class="mb-4" id="options-container">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Options</label>
+                    <div id="options-list"></div>
+                    <button type="button" id="add-option-btn" class="mt-2 inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i class="fas fa-plus mr-1"></i>
+                        Add Option
+                    </button>
+                </div>
+                <div class="mb-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="question-required" name="is_required" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                        <span class="ml-2 text-sm text-gray-700">Required question</span>
+                    </label>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-question-btn" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Cancel</button>
+                    <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Form builder functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const formId = {{ form.id }};
+    let draggedElement = null;
+
+    // Mobile menu toggle
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const sidebar = document.getElementById('sidebar');
+
+    mobileMenuToggle.addEventListener('click', function() {
+        sidebar.classList.toggle('open');
+    });
+
+    // Close sidebar when clicking outside on mobile
+    document.addEventListener('click', function(event) {
+        if (!sidebar.contains(event.target) && !mobileMenuToggle.contains(event.target) && window.innerWidth <= 768) {
+            sidebar.classList.remove('open');
+        }
+    });
+
+    // Drag and drop functionality
+    document.addEventListener('dragstart', function(e) {
+        if (e.target.classList.contains('question-type-card')) {
+            draggedElement = e.target;
+            e.dataTransfer.setData('text/plain', e.target.dataset.type || 'template-' + e.target.dataset.templateId);
+        }
+    });
+
+    document.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        if (e.target.classList.contains('questions-container') || e.target.closest('.questions-container')) {
+            e.target.closest('.questions-container').classList.add('bg-blue-50');
+        }
+    });
+
+    document.addEventListener('dragleave', function(e) {
+        if (e.target.classList.contains('questions-container') || e.target.closest('.questions-container')) {
+            e.target.closest('.questions-container').classList.remove('bg-blue-50');
+        }
+    });
+
+    document.addEventListener('drop', function(e) {
+        e.preventDefault();
+        const questionsContainer = e.target.closest('.questions-container');
+        if (questionsContainer) {
+            questionsContainer.classList.remove('bg-blue-50');
+            const sectionId = questionsContainer.closest('.section-card').dataset.sectionId;
+            const data = e.dataTransfer.getData('text/plain');
+
+            if (data.startsWith('template-')) {
+                const templateId = data.replace('template-', '');
+                addQuestionFromTemplate(sectionId, templateId);
+            } else {
+                addQuestion(sectionId, data);
+            }
+        }
+    });
+
+    // Section management
+    document.getElementById('add-section-btn').addEventListener('click', function() {
+        openSectionModal();
+    });
+
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('edit-section-btn') || e.target.closest('.edit-section-btn')) {
+            const sectionCard = e.target.closest('.section-card');
+            const sectionId = sectionCard.dataset.sectionId;
+            editSection(sectionId);
+        }
+
+        if (e.target.classList.contains('delete-section-btn') || e.target.closest('.delete-section-btn')) {
+            const sectionCard = e.target.closest('.section-card');
+            const sectionId = sectionCard.dataset.sectionId;
+            if (confirm('Are you sure you want to delete this section?')) {
+                deleteSection(sectionId);
+            }
+        }
+    });
+
+    // Question management
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('add-question-btn') || e.target.closest('.add-question-btn')) {
+            const sectionCard = e.target.closest('.section-card');
+            const sectionId = sectionCard.dataset.sectionId;
+            openQuestionModal(sectionId);
+        }
+
+        if (e.target.classList.contains('edit-question-btn') || e.target.closest('.edit-question-btn')) {
+            const questionItem = e.target.closest('.question-item');
+            const questionId = questionItem.dataset.questionId;
+            editQuestion(questionId);
+        }
+
+        if (e.target.classList.contains('delete-question-btn') || e.target.closest('.delete-question-btn')) {
+            const questionItem = e.target.closest('.question-item');
+            const questionId = questionItem.dataset.questionId;
+            if (confirm('Are you sure you want to delete this question?')) {
+                deleteQuestion(questionId);
+            }
+        }
+    });
+
+    // Publish/Unpublish
+    document.getElementById('publish-btn')?.addEventListener('click', function() {
+        publishForm();
+    });
+
+    document.getElementById('unpublish-btn')?.addEventListener('click', function() {
+        unpublishForm();
+    });
+
+    // Modal management
+    function openSectionModal(sectionId = null) {
+        const modal = document.getElementById('section-modal');
+        const form = document.getElementById('section-form');
+        const title = document.getElementById('section-modal-title');
+
+        if (sectionId) {
+            title.textContent = 'Edit Section';
+            // Load section data
+            const sectionCard = document.querySelector(`[data-section-id="${sectionId}"]`);
+            document.getElementById('section-id').value = sectionId;
+            document.getElementById('section-title').value = sectionCard.querySelector('.section-title').textContent;
+            document.getElementById('section-description').value = sectionCard.querySelector('.section-description')?.textContent || '';
+        } else {
+            title.textContent = 'Add Section';
+            form.reset();
+            document.getElementById('section-id').value = '';
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    function openQuestionModal(sectionId, questionId = null) {
+        const modal = document.getElementById('question-modal');
+        const form = document.getElementById('question-form');
+        const title = document.getElementById('question-modal-title');
+
+        document.getElementById('section-id-for-question').value = sectionId;
+
+        if (questionId) {
+            title.textContent = 'Edit Question';
+            // Load question data (would need AJAX call in real implementation)
+            document.getElementById('question-id').value = questionId;
+        } else {
+            title.textContent = 'Add Question';
+            form.reset();
+            document.getElementById('question-id').value = '';
+            updateOptionsDisplay([]);
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    // Close modals
+    document.getElementById('cancel-section-btn').addEventListener('click', function() {
+        document.getElementById('section-modal').classList.add('hidden');
+    });
+
+    document.getElementById('cancel-question-btn').addEventListener('click', function() {
+        document.getElementById('question-modal').classList.add('hidden');
+    });
+
+    // Form submissions
+    document.getElementById('section-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveSection();
+    });
+
+    document.getElementById('question-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveQuestion();
+    });
+
+    // Options management
+    document.getElementById('add-option-btn').addEventListener('click', function() {
+        addOptionField();
+    });
+
+    function updateOptionsDisplay(options) {
+        const container = document.getElementById('options-list');
+        container.innerHTML = '';
+        options.forEach((option, index) => {
+            addOptionField(option, index);
+        });
+    }
+
+    function addOptionField(value = '', index = null) {
+        const container = document.getElementById('options-list');
+        const optionDiv = document.createElement('div');
+        optionDiv.className = 'flex items-center space-x-2 mb-2';
+        optionDiv.innerHTML = `
+            <input type="text" name="options[]" value="${value}" class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Option ${index !== null ? index + 1 : ''}">
+            <button type="button" class="remove-option-btn p-2 text-red-500 hover:text-red-700" aria-label="Remove option">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        container.appendChild(optionDiv);
+
+        // Add remove functionality
+        optionDiv.querySelector('.remove-option-btn').addEventListener('click', function() {
+            optionDiv.remove();
+        });
+    }
+
+    // Question type change handler
+    document.getElementById('question-type').addEventListener('change', function() {
+        const type = this.value;
+        const optionsContainer = document.getElementById('options-container');
+
+        if (['select', 'radio', 'checkbox'].includes(type)) {
+            optionsContainer.style.display = 'block';
+        } else {
+            optionsContainer.style.display = 'none';
+        }
+    });
+
+    // AJAX functions (simplified - would need proper implementation)
+    function addQuestion(sectionId, type) {
+        showLoading();
+        // AJAX call to add question
+        fetch(`/forms/${formId}/add_question`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+            },
+            body: JSON.stringify({
+                section_id: sectionId,
+                question_type: type
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload(); // Simple reload for now
+            } else {
+                alert('Error adding question');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error adding question');
+        })
+        .finally(() => {
+            hideLoading();
+        });
+    }
+
+    function addQuestionFromTemplate(sectionId, templateId) {
+        showLoading();
+        // AJAX call to add question from template
+        fetch(`/forms/${formId}/add_question_from_template`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+            },
+            body: JSON.stringify({
+                section_id: sectionId,
+                template_id: templateId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error adding question from template');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error adding question from template');
+        })
+        .finally(() => {
+            hideLoading();
+        });
+    }
+
+    function editSection(sectionId) {
+        // Load section data and open modal
+        const sectionCard = document.querySelector(`[data-section-id="${sectionId}"]`);
+        openSectionModal(sectionId);
+    }
+
+    function deleteSection(sectionId) {
+        showLoading();
+        // AJAX call to delete section
+        fetch(`/forms/${formId}/delete_section/${sectionId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error deleting section');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting section');
+        })
+        .finally(() => {
+            hideLoading();
+        });
+    }
+
+    function editQuestion(questionId) {
+        // Load question data and open modal
+        const questionItem = document.querySelector(`[data-question-id="${questionId}"]`);
+        const sectionId = questionItem.closest('.section-card').dataset.sectionId;
+        openQuestionModal(sectionId, questionId);
+    }
+
+    function deleteQuestion(questionId) {
+        showLoading();
+        // AJAX call to delete question
+        fetch(`/forms/${formId}/delete_question/${questionId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error deleting question');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting question');
+        })
+        .finally(() => {
+            hideLoading();
+        });
+    }
+
+    function saveSection() {
+        const formData = new FormData(document.getElementById('section-form'));
+        const data = Object.fromEntries(formData);
+
+        showLoading();
+        fetch(`/forms/${formId}/save_section`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('section-modal').classList.add('hidden');
+                location.reload();
+            } else {
+                alert('Error saving section');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error saving section');
+        })
+        .finally(() => {
+            hideLoading();
+        });
+    }
+
+    function saveQuestion() {
+        const formData = new FormData(document.getElementById('question-form'));
+        const data = Object.fromEntries(formData);
+
+        showLoading();
+        fetch(`/forms/${formId}/save_question`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('question-modal').classList.add('hidden');
+                location.reload();
+            } else {
+                alert('Error saving question');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error saving question');
+        })
+        .finally(() => {
+            hideLoading();
+        });
+    }
+
+    function publishForm() {
+        if (!confirm('Are you sure you want to publish this form? It will be publicly accessible.')) {
+            return;
+        }
+
+        showLoading();
+        fetch(`/forms/${formId}/publish`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error publishing form');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error publishing form');
+        })
+        .finally(() => {
+            hideLoading();
+        });
+    }
+
+    function unpublishForm() {
+        if (!confirm('Are you sure you want to unpublish this form? It will no longer be publicly accessible.')) {
+            return;
+        }
+
+        showLoading();
+        fetch(`/forms/${formId}/unpublish`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error unpublishing form');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error unpublishing form');
+        })
+        .finally(() => {
+            hideLoading();
+        });
+    }
+
+    function showLoading() {
+        document.getElementById('loading-overlay').style.display = 'flex';
+    }
+
+    function hideLoading() {
+        document.getElementById('loading-overlay').style.display = 'none';
+    }
+});
+</script>
+{% endblock %}
