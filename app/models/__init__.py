@@ -39,6 +39,10 @@ class User(UserMixin, db.Model):
     # Password reset fields
     password_reset_token = db.Column(db.String(100), unique=True)
     password_reset_expires = db.Column(db.DateTime)
+
+    # Email verification fields
+    email_verification_token = db.Column(db.String(100), unique=True)
+    email_verification_expires = db.Column(db.DateTime)
     
     # Relationships
     created_forms = db.relationship('Form', backref='creator', lazy=True, foreign_keys='Form.created_by')
@@ -80,6 +84,26 @@ class User(UserMixin, db.Model):
         """Clear the reset token after use"""
         self.password_reset_token = None
         self.password_reset_expires = None
+
+    def generate_verification_token(self):
+        """Generate an email verification token"""
+        import secrets
+        from datetime import datetime, timedelta
+        self.email_verification_token = secrets.token_urlsafe(32)
+        self.email_verification_expires = datetime.utcnow() + timedelta(hours=24)  # Token expires in 24 hours
+        return self.email_verification_token
+
+    def verify_email_token(self, token):
+        """Verify if the email verification token is valid"""
+        from datetime import datetime
+        if self.email_verification_token == token and self.email_verification_expires > datetime.utcnow():
+            return True
+        return False
+
+    def clear_verification_token(self):
+        """Clear the verification token after use"""
+        self.email_verification_token = None
+        self.email_verification_expires = None
 
     @login_manager.user_loader
     def load_user(user_id):

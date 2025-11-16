@@ -1,6 +1,6 @@
 from flask import request, jsonify, current_app, render_template, session
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, get_jwt
-from app import db
+from app import db, limiter
 from app.auth import bp
 from app.models import User
 from app.schemas import LoginFormSchema, RegisterFormSchema, UserSchema
@@ -15,6 +15,7 @@ login_schema = LoginFormSchema()
 register_schema = RegisterFormSchema()
 
 @bp.route('/register', methods=['GET', 'POST'])
+@limiter.limit("5 per hour")
 def register():
     """Register a new user account"""
     if request.method == 'GET':
@@ -60,21 +61,53 @@ def register():
             email=email,
             first_name=first_name,
             last_name=last_name,
-            is_verified=False  # Email verification would be implemented in a real app
+            is_verified=False
         )
         user.set_password(password)
-        
+
+        # Generate email verification token
+        verification_token = user.generate_verification_token()
+
         # Add to database
         db.session.add(user)
         db.session.commit()
-        
+
+        # Send verification email
+        try:
+            from flask_mail import Message
+            from app import mail
+            from flask import current_app
+
+            verification_url = url_for('auth.verify_email', token=verification_token, _external=True)
+            msg = Message('Email Verification - Form Builder',
+                         sender=current_app.config['MAIL_DEFAULT_SENDER'],
+                         recipients=[user.email])
+            msg.body = f'''Hi {user.username},
+
+Thank you for registering with Form Builder!
+
+Please click the following link to verify your email address:
+{verification_url}
+
+This link will expire in 24 hours.
+
+If you didn't create an account, please ignore this email.
+
+Best regards,
+The Form Builder Team
+'''
+            mail.send(msg)
+        except Exception as e:
+            current_app.logger.error(f"Failed to send verification email: {str(e)}")
+            # Don't fail registration if email fails, but log it
+
         # Return user data (without password)
         result = user_schema.dump(user)
         if request.is_json:
-            return jsonify({'message': 'User registered successfully', 'data': result}), 201
+            return jsonify({'message': 'User registered successfully. Please check your email to verify your account.', 'data': result}), 201
         else:
             from flask import flash, redirect, url_for
-            flash('Registration successful! Please login.', 'success')
+            flash('Registration successful! Please check your email to verify your account.', 'success')
             return redirect(url_for('auth.login'))
     
     except Exception as e:
@@ -83,6 +116,7 @@ def register():
         return jsonify({'error': 'registration_failed', 'message': 'Registration failed'}), 500
 
 @bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def login():
     """Authenticate user and return JWT tokens"""
     if request.method == 'GET':
@@ -124,6 +158,13 @@ def login():
                 return jsonify({'error': 'account_disabled', 'message': 'Account is disabled'}), 401
             else:
                 flash('Account is disabled', 'error')
+                return redirect(url_for('auth.login'))
+
+        if not user.is_verified:
+            if request.is_json:
+                return jsonify({'error': 'email_not_verified', 'message': 'Please verify your email before logging in'}), 401
+            else:
+                flash('Please verify your email before logging in', 'error')
                 return redirect(url_for('auth.login'))
         
         # Create tokens
@@ -375,3 +416,52 @@ def reset_password(token):
         db.session.rollback()
         current_app.logger.error(f"Reset password error: {str(e)}")
         return jsonify({'error': 'reset_failed', 'message': 'Failed to reset password'}), 500
+
+@bp.route('/verify-email/<token>', methods=['GET', 'POST'])
+def verify_email(token):
+    """Handle email verification"""
+    if request.method == 'GET':
+        # Verify token is valid
+        user = User.query.filter_by(email_verification_token=token).first()
+        if not user or not user.verify_email_token(token):
+            from flask import flash, redirect, url_for
+            flash('Invalid or expired verification token', 'error')
+            return redirect(url_for('auth.login'))
+        return render_template('auth/verify_email.html', token=token)
+
+    try:
+        # Determine input type
+        if request.is_json:
+            data = request.json
+        else:
+            data = request.form.to_dict()
+
+        token = data.get('token') or request.form.get('token')
+
+        # Find user by token
+        user = User.query.filter_by(email_verification_token=token).first()
+        if not user or not user.verify_email_token(token):
+            if request.is_json:
+                return jsonify({'error': 'invalid_token', 'message': 'Invalid or expired verification token'}), 400
+            else:
+                from flask import flash, redirect, url_for
+                flash('Invalid or expired verification token', 'error')
+                return redirect(url_for('auth.login'))
+
+        # Verify the user
+        user.is_verified = True
+        user.clear_verification_token()
+        user.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        if request.is_json:
+            return jsonify({'message': 'Email verified successfully'}), 200
+        else:
+            from flask import flash, redirect, url_for
+            flash('Email verified successfully! You can now login.', 'success')
+            return redirect(url_for('auth.login'))
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Email verification error: {str(e)}")
+        return jsonify({'error': 'verification_failed', 'message': 'Failed to verify email'}), 500

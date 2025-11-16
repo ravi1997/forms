@@ -6,6 +6,9 @@ from flask_login import LoginManager
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_mail import Mail
+from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_caching import Cache
 from celery import Celery
 from config import config
@@ -22,6 +25,8 @@ login_manager = LoginManager()
 jwt = JWTManager()
 cors = CORS()
 mail = Mail()
+csrf = CSRFProtect()
+limiter = Limiter(key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
 cache = Cache()
 
 # Initialize Celery
@@ -45,6 +50,8 @@ def create_app(config_name='default'):
     jwt.init_app(app)
     cors.init_app(app)
     mail.init_app(app)
+    csrf.init_app(app)
+    limiter.init_app(app)
     cache.init_app(app)
 
     # Configure Celery

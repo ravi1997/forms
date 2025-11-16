@@ -1,6 +1,6 @@
 from flask import request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app import db
+from app import db, limiter
 from app.api import bp
 from app.models import User, Form, Section, Question, Response, Answer, FormTemplate, QuestionLibrary, AuditLog, UserRoles, QuestionTypes
 from app.schemas import (
@@ -672,6 +672,7 @@ def delete_question(question_id):
     return jsonify({'message': 'Question deleted successfully'}), 204
 
 @bp.route('/forms/<int:form_id>/responses', methods=['POST'])
+@limiter.limit("10 per minute")
 def submit_form_response(form_id):
     """Submit a response to a form"""
     # Check if form exists and is published
