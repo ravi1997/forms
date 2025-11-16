@@ -958,3 +958,335 @@ def use_template(template_id):
     )
     
     return jsonify({'message': 'Form created from template successfully', 'data': form_schema.dump(form)}), 201
+    return jsonify({'message': 'Form created from template successfully', 'data': form_schema.dump(form)}), 201
+
+@bp.route('/forms/<int:form_id>/responses/export', methods=['GET'])
+@jwt_required()
+def export_form_responses(form_id):
+    """Export form responses in specified format"""
+    current_user_id = get_jwt_identity()
+    form = Form.query.get(form_id)
+
+    if not form:
+        return jsonify({'error': 'form_not_found', 'message': 'Form not found'}), 404
+
+    # Check if user has permission to export responses
+    if form.created_by != current_user_id and not User.query.get(current_user_id).can_view_analytics():
+        return jsonify({'error': 'forbidden', 'message': 'You do not have permission to export responses'}), 403
+
+    # Get format from query parameter
+    format_type = request.args.get('format', 'csv').lower()
+
+    # Get responses
+    responses = Response.query.filter_by(form_id=form_id).all()
+
+    # Get all questions in the form to create headers
+    all_sections = form.sections
+    questions = []
+    for section in all_sections:
+        questions.extend(section.questions)
+
+    if format_type == 'csv':
+        # Create CSV
+        import io
+        import csv
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # Create header row with question texts
+        headers = ['Response ID', 'Submitted At', 'User ID']
+        for question in questions:
+            headers.append(question.question_text)
+        writer.writerow(headers)
+
+        # Add response data
+        for response in responses:
+            answers = {answer.question_id: answer for answer in response.answers}
+            row = [response.id, response.submitted_at.isoformat() if response.submitted_at else '', response.user_id or 'Anonymous']
+
+            for question in questions:
+                answer = answers.get(question.id)
+                if answer:
+                    # Use answer_text if available, otherwise answer_value
+                    value = answer.answer_text or str(answer.answer_value) if answer.answer_value else ''
+                    row.append(value)
+                else:
+                    row.append('')
+
+            writer.writerow(row)
+
+        # Convert to bytes
+        csv_content = output.getvalue().encode('utf-8')
+        output.close()
+
+        # Return CSV file
+        from flask import Response
+        return Response(
+            csv_content,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename=responses_{form_id}.csv'}
+        )
+
+    elif format_type == 'json':
+        # Create JSON
+        responses_data = []
+        for response in responses:
+            response_data = {
+                'response_id': response.id,
+                'submitted_at': response.submitted_at.isoformat() if response.submitted_at else None,
+                'user_id': response.user_id,
+                'answers': []
+            }
+
+            for answer in response.answers:
+                answer_data = {
+                    'question_id': answer.question_id,
+                    'question_text': answer.question.question_text,
+                    'answer_text': answer.answer_text,
+                    'answer_value': answer.answer_value
+                }
+                response_data['answers'].append(answer_data)
+
+            responses_data.append(response_data)
+
+        # Convert to JSON string
+        import json
+        json_content = json.dumps(responses_data, indent=2, default=str)
+
+        # Return JSON file
+        from flask import Response
+        return Response(
+            json_content,
+            mimetype='application/json',
+            headers={'Content-Disposition': f'attachment; filename=responses_{form_id}.json'}
+        )
+
+    elif format_type == 'excel':
+        # Create Excel file using pandas
+        import pandas as pd
+        from io import BytesIO
+
+        # Prepare data
+        data = []
+        for response in responses:
+            answers = {answer.question_id: answer for answer in response.answers}
+            row = {
+                'Response ID': response.id,
+                'Submitted At': response.submitted_at,
+                'User ID': response.user_id or 'Anonymous'
+            }
+
+            for question in questions:
+                answer = answers.get(question.id)
+                if answer:
+                    # Use answer_text if available, otherwise answer_value
+                    value = answer.answer_text or str(answer.answer_value) if answer.answer_value else ''
+                    row[question.question_text] = value
+                else:
+                    row[question.question_text] = ''
+
+            data.append(row)
+
+        # Create DataFrame
+        df = pd.DataFrame(data)
+
+        # Create Excel in memory
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Responses')
+
+        # Return Excel file
+        output.seek(0)
+        from flask import send_file
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'responses_{form_id}.xlsx'
+        )
+
+    else:
+        return jsonify({'error': 'invalid_format', 'message': 'Invalid export format. Use csv, json, or excel'}), 400
+
+@bp.route('/forms/<int:form_id>/analytics', methods=['GET'])
+@jwt_required()
+def get_form_analytics(form_id):
+    """Get analytics data for a form"""
+    current_user_id = get_jwt_identity()
+    form = Form.query.get(form_id)
+
+    if not form:
+        return jsonify({'error': 'form_not_found', 'message': 'Form not found'}), 404
+
+    # Check if user has permission to view analytics
+    if form.created_by != current_user_id and not User.query.get(current_user_id).can_view_analytics():
+        return jsonify({'error': 'forbidden', 'message': 'You do not have permission to view analytics'}), 403
+
+    # Get query parameters
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    # Get responses with date filtering
+    query = Response.query.filter_by(form_id=form_id)
+    if start_date:
+        from datetime import datetime
+        start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        query = query.filter(Response.submitted_at >= start_dt)
+    if end_date:
+        from datetime import datetime
+        end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        query = query.filter(Response.submitted_at <= end_dt)
+
+    responses = query.all()
+
+    # Prepare analytics data for each question
+    analytics_data = []
+    all_sections = form.sections
+    questions = []
+    for section in all_sections:
+        questions.extend(section.questions)
+
+    for question in questions:
+        question_analytics = {
+            'question_id': question.id,
+            'question_text': question.question_text,
+            'question_type': question.question_type.value,
+            'total_responses': 0,
+            'answers': {}
+        }
+
+        # Get all answers for this question
+        answers = Answer.query.join(Response).filter(
+            Answer.question_id == question.id,
+            Response.form_id == form_id
+        ).all()
+
+        # Apply date filtering if specified
+        if start_date or end_date:
+            filtered_answers = []
+            for answer in answers:
+                if answer.response.submitted_at:
+                    if start_date and answer.response.submitted_at < start_dt:
+                        continue
+                    if end_date and answer.response.submitted_at > end_dt:
+                        continue
+                filtered_answers.append(answer)
+            answers = filtered_answers
+
+        question_analytics['total_responses'] = len(answers)
+
+        # Process answers based on question type
+        if question.question_type in ['multiple_choice', 'checkbox', 'dropdown']:
+            # Count options
+            for answer in answers:
+                if answer.answer_value:
+                    if isinstance(answer.answer_value, list):
+                        # For checkboxes, answer_value is a list
+                        for option in answer.answer_value:
+                            if option in question_analytics['answers']:
+                                question_analytics['answers'][option] += 1
+                            else:
+                                question_analytics['answers'][option] = 1
+                    else:
+                        option = answer.answer_value or answer.answer_text
+                        if option in question_analytics['answers']:
+                            question_analytics['answers'][option] += 1
+                        else:
+                            question_analytics['answers'][option] = 1
+                elif answer.answer_text:
+                    option = answer.answer_text
+                    if option in question_analytics['answers']:
+                        question_analytics['answers'][option] += 1
+                    else:
+                        question_analytics['answers'][option] = 1
+        elif question.question_type == 'rating':
+            # Calculate average rating and distribution
+            ratings = []
+            for answer in answers:
+                try:
+                    rating = int(answer.answer_text) if answer.answer_text else 0
+                    ratings.append(rating)
+                    str_rating = str(rating)
+                    if str_rating in question_analytics['answers']:
+                        question_analytics['answers'][str_rating] += 1
+                    else:
+                        question_analytics['answers'][str_rating] = 1
+                except ValueError:
+                    pass  # Skip invalid ratings
+
+            if ratings:
+                question_analytics['average_rating'] = sum(ratings) / len(ratings)
+        else:
+            # For other question types
+            question_analytics['answers'] = {'total_responses': len(answers)}
+
+        analytics_data.append(question_analytics)
+
+    # Prepare time-based analytics
+    time_analytics = {
+        'total_responses': len(responses),
+        'responses_over_time': {}
+    }
+
+    if responses:
+        for response in responses:
+            if response.submitted_at:
+                date_str = response.submitted_at.strftime('%Y-%m-%d')
+                if date_str in time_analytics['responses_over_time']:
+                    time_analytics['responses_over_time'][date_str] += 1
+                else:
+                    time_analytics['responses_over_time'][date_str] = 1
+
+    return jsonify({
+        'analytics_data': analytics_data,
+        'time_analytics': time_analytics
+    }), 200
+    return jsonify({
+        'analytics_data': analytics_data,
+        'time_analytics': time_analytics
+    }), 200
+
+@bp.route('/analytics/dashboard', methods=['GET'])
+@jwt_required()
+def get_dashboard_analytics():
+    """Get dashboard analytics for current user"""
+    current_user_id = get_jwt_identity()
+
+    # Get user's forms
+    user_forms = Form.query.filter_by(created_by=current_user_id).all()
+
+    # Get overall stats
+    total_forms = len(user_forms)
+    total_responses = Response.query.join(Form).filter(Form.created_by == current_user_id).count()
+
+    # Get recent activity (last 7 days)
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    recent_responses = Response.query.join(Form).filter(
+        Form.created_by == current_user_id,
+        Response.submitted_at >= seven_days_ago
+    ).count()
+
+    # Get responses over time for the last 30 days
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    daily_responses = db.session.query(
+        func.date(Response.submitted_at).label('date'),
+        func.count(Response.id).label('count')
+    ).join(Form).filter(
+        Form.created_by == current_user_id,
+        Response.submitted_at >= thirty_days_ago
+    ).group_by(func.date(Response.submitted_at)).order_by('date').all()
+
+    # Prepare chart data
+    chart_data = []
+    for date, count in daily_responses:
+        chart_data.append({
+            'date': date.isoformat() if hasattr(date, 'isoformat') else str(date),
+            'count': count
+        })
+
+    return jsonify({
+        'total_forms': total_forms,
+        'total_responses': total_responses,
+        'recent_responses': recent_responses,
+        'chart_data': chart_data
+    }), 200
