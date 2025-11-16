@@ -9,10 +9,6 @@ import json
 import io
 from datetime import datetime
 import pandas as pd
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
 
 response_schema = ResponseSchema()
 
@@ -213,89 +209,8 @@ def export_responses(form_id):
             download_name=f'responses_{form_id}.xlsx'
         )
     
-    elif format_type == 'pdf':
-        # Create PDF
-        from io import BytesIO
-        
-        # Prepare data for PDF
-        data = []
-        headers = ['Response ID', 'Submitted At', 'User ID']
-        
-        # Get all questions in the form to create headers
-        all_sections = form.sections
-        questions = []
-        for section in all_sections:
-            questions.extend(section.questions)
-        
-        # Add question titles as headers
-        for question in questions:
-            headers.append(question.question_text)
-        
-        data.append(headers)
-        
-        # Add response data
-        for response in responses:
-            answers = {answer.question_id: answer for answer in response.answers}
-            row = [str(response.id), response.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if response.submitted_at else 'N/A', 
-                   str(response.user_id or 'Anonymous')]
-            
-            for question in questions:
-                answer = answers.get(question.id)
-                if answer:
-                    # Use answer_text if available, otherwise answer_value
-                    value = answer.answer_text or str(answer.answer_value) if answer.answer_value else ''
-                    row.append(value)
-                else:
-                    row.append('')
-            
-            data.append(row)
-        
-        # Create PDF in memory
-        output = BytesIO()
-        doc = SimpleDocTemplate(output, pagesize=letter)
-        story = []
-        
-        # Title
-        styles = getSampleStyleSheet()
-        title = Paragraph(f"Form Responses - {form.title}", styles['Title'])
-        story.append(title)
-        story.append(Spacer(1, 12))
-        
-        # Add form information
-        form_info = Paragraph(f"Form ID: {form.id} | Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal'])
-        story.append(form_info)
-        story.append(Spacer(1, 12))
-        
-        # Create table
-        table = Table(data)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        
-        story.append(table)
-        story.append(PageBreak())
-        
-        # Build PDF
-        doc.build(story)
-        
-        # Return PDF file
-        output.seek(0)
-        return send_file(
-            output,
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name=f'responses_{form_id}.pdf'
-        )
-    
     else:
-        return jsonify({'error': 'invalid_format', 'message': 'Invalid export format. Use csv, json, excel, or pdf'}), 400
+        return jsonify({'error': 'invalid_format', 'message': 'Invalid export format. Use csv, json, or excel'}), 400
 
 @bp.route('/<int:form_id>/analytics', methods=['GET'])
 def form_analytics(form_id):
