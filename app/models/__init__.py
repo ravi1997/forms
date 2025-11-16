@@ -165,13 +165,13 @@ class Question(db.Model):
 
 class Response(db.Model):
     __tablename__ = 'response'
-    
+
     id = db.Column(db.Integer, primary_key=True)
-    form_id = db.Column(db.Integer, db.ForeignKey('form.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    form_id = db.Column(db.Integer, db.ForeignKey('form.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), index=True)
     ip_address = db.Column(db.String(45))  # IPv4 or IPv6
     user_agent = db.Column(db.Text)  # Browser info
-    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    submitted_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     completed_at = db.Column(db.DateTime)  # When the response was fully submitted
     
     # Relationships
@@ -185,10 +185,10 @@ class Response(db.Model):
 
 class Answer(db.Model):
     __tablename__ = 'answer'
-    
+
     id = db.Column(db.Integer, primary_key=True)
-    response_id = db.Column(db.Integer, db.ForeignKey('response.id'), nullable=False)
-    question_id = db.Column(db.Integer, db.ForeignKey('question.id'), nullable=False)
+    response_id = db.Column(db.Integer, db.ForeignKey('response.id'), nullable=False, index=True)
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'), nullable=False, index=True)
     answer_text = db.Column(db.Text)  # For text answers
     answer_value = db.Column(db.JSON)  # For complex answers (checkboxes, files, etc.)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

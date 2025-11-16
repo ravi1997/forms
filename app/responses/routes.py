@@ -1,6 +1,6 @@
 from flask import render_template, request, jsonify, current_app, send_file, session
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app import db
+from app import db, cache, celery
 from app.responses import bp
 from app.models import User, Form, Response, Answer, UserRoles
 from app.schemas import ResponseSchema
@@ -46,16 +46,11 @@ def list_responses(form_id):
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 10, type=int), 100)
     
-    responses = Response.query.filter_by(form_id=form_id).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
-    
-    # For each response, get the answers
-    for response in responses.items:
-        response.answers = Answer.query.filter_by(response_id=response.id).all()
-        # Also get the user info if available
-        if response.user_id:
-            response.user_info = User.query.get(response.user_id)
+    # Use eager loading to avoid N+1 queries
+    responses = Response.query.filter_by(form_id=form_id).options(
+        db.joinedload(Response.answers),
+        db.joinedload(Response.user)
+    ).paginate(page=page, per_page=per_page, error_out=False)
     
     return render_template('responses/list.html', form=form, responses=responses)
 
@@ -88,7 +83,21 @@ def export_responses(form_id):
     # Get format from query parameter
     format_type = request.args.get('format', 'csv').lower()
     
-    # Get all responses for this form
+    # Check if this is a large export that should be processed in background
+    response_count = Response.query.filter_by(form_id=form_id).count()
+
+    # For large datasets (>1000 responses), use background processing
+    if response_count > 1000:
+        from app.tasks import export_responses_task
+        task = export_responses_task.delay(form_id, format_type, current_user_id)
+        return jsonify({
+            'status': 'processing',
+            'task_id': task.id,
+            'message': 'Large export started. You will receive a notification when complete.',
+            'response_count': response_count
+        })
+
+    # For smaller datasets, process immediately
     responses = Response.query.filter_by(form_id=form_id).all()
     
     # Get all questions in the form to create headers
@@ -298,6 +307,7 @@ def export_responses(form_id):
         return jsonify({'error': 'invalid_format', 'message': 'Invalid export format. Use csv, json, excel, or pdf'}), 400
 
 @bp.route('/<int:form_id>/analytics', methods=['GET'])
+@cache.cached(timeout=300, key_prefix=lambda: f"form_analytics_{request.args.get('form_id', '')}")
 def form_analytics(form_id):
     """Display analytics for a form"""
     # Try JWT first (API)
@@ -511,14 +521,11 @@ def filter_responses(form_id):
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 10, type=int), 10)
     
-    responses = query.paginate(page=page, per_page=per_page, error_out=False)
-    
-    # For each response, get the answers
-    for response in responses.items:
-        response.answers = Answer.query.filter_by(response_id=response.id).all()
-        # Also get the user info if available
-        if response.user_id:
-            response.user_info = User.query.get(response.user_id)
+    # Use eager loading to avoid N+1 queries
+    responses = query.options(
+        db.joinedload(Response.answers),
+        db.joinedload(Response.user)
+    ).paginate(page=page, per_page=per_page, error_out=False)
     
     return render_template('responses/list.html', form=form, responses=responses, filtered=True)
 
