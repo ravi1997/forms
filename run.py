@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app import create_app, db
 from app.models import User, Form, Section, Question, Response, Answer, FormTemplate, QuestionLibrary, AuditLog
 from flask_migrate import upgrade
@@ -20,6 +20,6 @@ if __name__ == '__main__':
             print(f"Error running migrations: {e}")
     
     # Set a start time for health checks
-    app.config['START_TIME'] = 'started_at_' + str(datetime.utcnow())
+    app.config['START_TIME'] = 'started_at_' + str(datetime.now(tz=timezone.utc))
     
     app.run(debug=app.config.get('DEBUG', False))

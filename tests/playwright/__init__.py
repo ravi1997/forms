@@ -1,1 +1,0 @@
-# Playwright tests package
