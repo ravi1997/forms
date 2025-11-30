@@ -10,29 +10,7 @@ form_schema = FormSchema()
 section_schema = SectionSchema()
 question_schema = QuestionSchema()
 
-def _get_current_user_id():
-    """Return the authenticated user's ID from JWT or session, otherwise None."""
-    try:
-        return get_jwt_identity()
-    except Exception:
-        user_data = session.get('user')
-        if user_data:
-            return user_data.get('id')
-    return None
 
-def _login_required_response(message):
-    """Return an authentication required response appropriate for the request type."""
-    if request.is_json:
-        return jsonify({'error': 'authentication_required', 'message': message}), 401
-    flash(message, 'error')
-    return redirect(url_for('auth.login'))
-
-def _permission_denied_response(message, redirect_endpoint='main.dashboard'):
-    """Return a permission denied response appropriate for the request type."""
-    if request.is_json:
-        return jsonify({'error': 'forbidden', 'message': message}), 403
-    flash(message, 'error')
-    return redirect(url_for(redirect_endpoint))
 
 def _parse_question_payload():
     """Extract question payload data from JSON or form submissions."""
@@ -169,32 +147,13 @@ def form_submitted(form_id):
     form = Form.query.get_or_404(form_id)
     return render_template('forms/submitted.html', form=form)
 
+from app.utils.decorators import login_required, form_owner_required
+
 @bp.route('/<int:form_id>/builder', methods=['GET'])
-def form_builder(form_id):
+@login_required
+@form_owner_required
+def form_builder(form_id, current_user_id, form):
     """Display form builder interface"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to access form builder', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
-    form = Form.query.get_or_404(form_id)
-
-    # Check if user has permission to edit this form
-    if form.created_by != current_user_id:
-        if request.is_json:
-            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to edit this form'}), 403
-        else:
-            from flask import flash, redirect, url_for
-            flash('You do not have permission to edit this form', 'error')
-            return redirect(url_for('main.dashboard'))
-
     # Get existing sections and questions
     sections = Section.query.filter_by(form_id=form_id).order_by(Section.order).all()
     for section in sections:
@@ -208,69 +167,17 @@ def form_builder(form_id):
     return render_template('forms/builder.html', form=form, sections=sections, question_templates=question_templates)
 
 @bp.route('/<int:form_id>/update_structure', methods=['POST'])
-def update_form_structure(form_id):
+@login_required
+@form_owner_required
+def update_form_structure(form_id, current_user_id, form):
     """Update form structure (sections and questions)"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to update form structure', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
-    form = Form.query.get_or_404(form_id)
-
-    # Check if user has permission to edit this form
-    if form.created_by != current_user_id:
-        if request.is_json:
-            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to edit this form'}), 403
-        else:
-            from flask import flash, redirect, url_for
-            flash('You do not have permission to edit this form', 'error')
-            return redirect(url_for('main.dashboard'))
-    
-    # Get new structure from request
     structure = request.json.get('structure', [])
     
     try:
-        # Clear existing sections and questions
-        # Note: This is simplified - in a real app, you'd want to update existing items
-        # rather than deleting and recreating them to preserve responses
-        for section in form.sections:
-            for question in section.questions:
-                db.session.delete(question)
-            db.session.delete(section)
-        
-        # Create new structure
-        for section_data in structure:
-            section = Section(
-                title=section_data.get('title', ''),
-                description=section_data.get('description', ''),
-                form_id=form_id,
-                order=section_data.get('order', 0)
-            )
-            db.session.add(section)
-            db.session.flush()  # Get section ID
-            
-            # Add questions to section
-            for question_data in section_data.get('questions', []):
-                question = Question(
-                    section_id=section.id,
-                    question_type=question_data['question_type'],
-                    question_text=question_data['question_text'],
-                    is_required=question_data.get('is_required', False),
-                    order=question_data.get('order', 0),
-                    validation_rules=question_data.get('validation_rules', {}),
-                    options=question_data.get('options', [])
-                )
-                db.session.add(question)
-        
-        db.session.commit()
-        
+        form, error = FormService.update_form_structure(form_id, structure)
+        if error:
+            return jsonify({'error': 'update_failed', 'message': error}), 400
+
         return jsonify({'message': 'Form structure updated successfully'}), 200
     except Exception as e:
         db.session.rollback()
@@ -278,20 +185,9 @@ def update_form_structure(form_id):
         return jsonify({'error': 'update_failed', 'message': 'Failed to update form structure'}), 500
 
 @bp.route('/templates', methods=['GET'])
-def list_templates():
+@login_required
+def list_templates(current_user_id):
     """List available form templates"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to access templates', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
     # Get all public templates and templates created by this user
     templates = FormTemplate.query.filter(
         (FormTemplate.is_public == True) | (FormTemplate.created_by == current_user_id)
@@ -300,107 +196,28 @@ def list_templates():
     return render_template('forms/templates.html', templates=templates)
 
 @bp.route('/create_from_template/<int:template_id>', methods=['GET'])
-def create_from_template(template_id):
+@login_required
+@roles_required(['admin', 'creator'])
+def create_from_template(template_id, current_user_id):
     """Create a new form from a template"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to create forms', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
+    form, error = FormService.create_form_from_template(template_id, current_user_id)
 
-    user = User.query.get_or_404(current_user_id)
-
-    if not user.can_create_forms():
+    if error:
         if request.is_json:
-            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to create forms'}), 403
+            return jsonify({'error': 'forbidden', 'message': error}), 403
         else:
             from flask import flash, redirect, url_for
-            flash('You do not have permission to create forms', 'error')
-            return redirect(url_for('main.dashboard'))
-
-    template = FormTemplate.query.get_or_404(template_id)
-
-    # Check if user has access to this template
-    if not template.is_public and template.created_by != current_user_id:
-        if request.is_json:
-            return jsonify({'error': 'forbidden', 'message': 'You do not have access to this template'}), 403
-        else:
-            from flask import flash, redirect, url_for
-            flash('You do not have access to this template', 'error')
+            flash(error, 'error')
             return redirect(url_for('forms.list_templates'))
-    
-    # Create new form from template
-    form = Form(
-        title=f"Copy of {template.name}",
-        description=template.description,
-        created_by=current_user_id,
-        template_id=template.id
-    )
-    
-    db.session.add(form)
-    db.session.flush() # Get form ID without committing
-    
-    # Create sections and questions from template content
-    template_content = template.content
-    if 'sections' in template_content:
-        for section_data in template_content['sections']:
-            section = Section(
-                title=section_data.get('title', ''),
-                description=section_data.get('description', ''),
-                form_id=form.id,
-                order=section_data.get('order', 0)
-            )
-            db.session.add(section)
-            db.session.flush()  # Get section ID without committing
-            
-            # Add questions to the section
-            if 'questions' in section_data:
-                for question_data in section_data['questions']:
-                    question = Question(
-                        section_id=section.id,
-                        question_type=question_data['question_type'],
-                        question_text=question_data['question_text'],
-                        is_required=question_data.get('is_required', False),
-                        order=question_data.get('order', 0),
-                        validation_rules=question_data.get('validation_rules', {}),
-                        options=question_data.get('options', [])
-                    )
-                    db.session.add(question)
-    
-    db.session.commit()
     
     # Redirect to form builder
     return redirect(url_for('forms.form_builder', form_id=form.id))
 
 @bp.route('/<int:form_id>/edit', methods=['GET', 'POST'])
-def edit_form(form_id):
+@login_required
+@form_owner_required
+def edit_form(form_id, current_user_id, form):
     """Edit form metadata"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to edit forms', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
-    form = Form.query.get_or_404(form_id)
-
-    # Check if user has permission to edit this form
-    if form.created_by != current_user_id:
-        from flask import flash, redirect, url_for
-        flash('You do not have permission to edit this form', 'error')
-        return redirect(url_for('main.dashboard'))
-
     if request.method == 'GET':
         return render_template('forms/edit_form.html', form=form)
 
@@ -426,31 +243,10 @@ def edit_form(form_id):
     return redirect(url_for('forms.edit_form', form_id=form_id))
 
 @bp.route('/<int:form_id>/delete', methods=['POST'])
-def delete_form(form_id):
+@login_required
+@form_owner_required
+def delete_form(form_id, current_user_id, form):
     """Delete a form"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to delete forms', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
-    form = Form.query.get_or_404(form_id)
-
-    # Check if user has permission to delete this form
-    if form.created_by != current_user_id:
-        if request.is_json:
-            return jsonify({'error': 'forbidden', 'message': 'You do not have permission to delete this form'}), 403
-        else:
-            from flask import flash, redirect, url_for
-            flash('You do not have permission to delete this form', 'error')
-            return redirect(url_for('main.dashboard'))
-
     try:
         db.session.delete(form)
         db.session.commit()
@@ -472,16 +268,10 @@ def delete_form(form_id):
             return redirect(url_for('forms.my_forms'))
 
 @bp.route('/<int:form_id>/publish', methods=['POST'])
-def publish_form(form_id):
+@login_required
+@form_owner_required
+def publish_form(form_id, current_user_id, form):
     """Publish a form so it becomes publicly accessible."""
-    current_user_id = _get_current_user_id()
-    if not current_user_id:
-        return _login_required_response('Please login to publish forms')
-
-    form = Form.query.get_or_404(form_id)
-    if form.created_by != current_user_id:
-        return _permission_denied_response('You do not have permission to publish this form')
-
     form.is_published = True
     form.is_archived = False
     form.published_at = datetime.utcnow()
@@ -496,16 +286,10 @@ def publish_form(form_id):
     return redirect(request.referrer or url_for('forms.form_builder', form_id=form.id))
 
 @bp.route('/<int:form_id>/unpublish', methods=['POST'])
-def unpublish_form(form_id):
+@login_required
+@form_owner_required
+def unpublish_form(form_id, current_user_id, form):
     """Mark a form as draft so it is no longer public."""
-    current_user_id = _get_current_user_id()
-    if not current_user_id:
-        return _login_required_response('Please login to update forms')
-
-    form = Form.query.get_or_404(form_id)
-    if form.created_by != current_user_id:
-        return _permission_denied_response('You do not have permission to unpublish this form')
-
     form.is_published = False
     form.updated_at = datetime.utcnow()
     db.session.commit()
@@ -518,16 +302,10 @@ def unpublish_form(form_id):
     return redirect(request.referrer or url_for('forms.form_builder', form_id=form.id))
 
 @bp.route('/<int:form_id>/archive', methods=['POST'])
-def archive_form(form_id):
+@login_required
+@form_owner_required
+def archive_form(form_id, current_user_id, form):
     """Archive a form to remove it from the active list."""
-    current_user_id = _get_current_user_id()
-    if not current_user_id:
-        return _login_required_response('Please login to archive forms')
-
-    form = Form.query.get_or_404(form_id)
-    if form.created_by != current_user_id:
-        return _permission_denied_response('You do not have permission to archive this form')
-
     form.is_archived = True
     form.is_published = False
     form.updated_at = datetime.utcnow()
@@ -541,16 +319,10 @@ def archive_form(form_id):
     return redirect(request.referrer or url_for('forms.my_forms'))
 
 @bp.route('/<int:form_id>/restore', methods=['POST'])
-def restore_form(form_id):
+@login_required
+@form_owner_required
+def restore_form(form_id, current_user_id, form):
     """Restore an archived form."""
-    current_user_id = _get_current_user_id()
-    if not current_user_id:
-        return _login_required_response('Please login to restore forms')
-
-    form = Form.query.get_or_404(form_id)
-    if form.created_by != current_user_id:
-        return _permission_denied_response('You do not have permission to restore this form')
-
     form.is_archived = False
     form.updated_at = datetime.utcnow()
     db.session.commit()
@@ -563,48 +335,19 @@ def restore_form(form_id):
     return redirect(request.referrer or url_for('forms.my_forms'))
 
 @bp.route('/my-forms', methods=['GET'])
-def my_forms():
+@login_required
+def my_forms(current_user_id):
     """List user's forms"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to view your forms', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
     # Get user's forms, ordered by creation date (newest first)
     forms = Form.query.filter_by(created_by=current_user_id).order_by(Form.created_at.desc()).all()
 
     return render_template('forms/my_forms.html', forms=forms)
 
 @bp.route('/<int:form_id>/settings', methods=['GET', 'POST'])
-def form_settings(form_id):
+@login_required
+@form_owner_required
+def form_settings(form_id, current_user_id, form):
     """Manage form settings"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to access form settings', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
-    form = Form.query.get_or_404(form_id)
-
-    # Check if user has permission to edit this form
-    if form.created_by != current_user_id:
-        from flask import flash, redirect, url_for
-        flash('You do not have permission to edit this form', 'error')
-        return redirect(url_for('main.dashboard'))
-
     if request.method == 'GET':
         return render_template('forms/form_settings.html', form=form)
 
@@ -641,20 +384,9 @@ def form_settings(form_id):
     return redirect(url_for('forms.form_settings', form_id=form_id))
 
 @bp.route('/question_library', methods=['GET'])
-def question_library():
+@login_required
+def question_library(current_user_id):
     """Display question library"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to access question library', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
     # Get all public questions and questions created by this user
     questions = QuestionLibrary.query.filter(
         (QuestionLibrary.is_public == True) | (QuestionLibrary.created_by == current_user_id)
@@ -663,12 +395,9 @@ def question_library():
     return render_template('forms/question_library.html', questions=questions)
 
 @bp.route('/question_library', methods=['POST'])
-def add_to_question_library():
+@login_required
+def add_to_question_library(current_user_id):
     """Add a question to the library"""
-    current_user_id = _get_current_user_id()
-    if not current_user_id:
-        return _login_required_response('Please login to add questions')
-
     question_text, question_type, options, is_required, is_public = _parse_question_payload()
 
     # Validate required fields
@@ -709,12 +438,9 @@ def add_to_question_library():
     return redirect(url_for('forms.question_library'))
 
 @bp.route('/question_library/<int:question_id>', methods=['PUT'])
-def update_question_library(question_id):
+@login_required
+def update_question_library(question_id, current_user_id):
     """Update an existing question library entry."""
-    current_user_id = _get_current_user_id()
-    if not current_user_id:
-        return _login_required_response('Please login to update questions')
-
     question = QuestionLibrary.query.get_or_404(question_id)
     if question.created_by != current_user_id:
         return _permission_denied_response('You do not have permission to edit this question', 'forms.question_library')
@@ -753,12 +479,9 @@ def update_question_library(question_id):
     return redirect(url_for('forms.question_library'))
 
 @bp.route('/question_library/<int:question_id>', methods=['DELETE'])
-def delete_question_library(question_id):
+@login_required
+def delete_question_library(question_id, current_user_id):
     """Delete a question from the library."""
-    current_user_id = _get_current_user_id()
-    if not current_user_id:
-        return _login_required_response('Please login to delete questions')
-
     question = QuestionLibrary.query.get_or_404(question_id)
     if question.created_by != current_user_id:
         return _permission_denied_response('You do not have permission to delete this question', 'forms.question_library')
@@ -773,50 +496,25 @@ def delete_question_library(question_id):
     flash(message, 'success')
     return redirect(url_for('forms.question_library'))
 
+from app.services.form_service import FormService
+from app.utils.helpers import get_request_data
+
+...
+
 @bp.route('/create', methods=['GET', 'POST'])
-def create_form():
+@login_required
+@roles_required(['admin', 'creator'])
+def create_form(current_user_id):
     """Create a new form"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to create forms', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
-    user = User.query.get_or_404(current_user_id)
-
-    if not user.can_create_forms():
-        from flask import flash, redirect, url_for
-        flash('You do not have permission to create forms', 'error')
-        return redirect(url_for('main.dashboard'))
-
     if request.method == 'GET':
         return render_template('forms/create_form.html')
 
-    # Handle POST request
-    title = request.form.get('title')
-    description = request.form.get('description', '')
+    data = get_request_data()
+    form, error = FormService.create_form(data, current_user_id)
 
-    # Validate required fields
-    if not title:
-        from flask import flash
-        flash('Form title is required', 'error')
-        return render_template('forms/create_form.html', title=title, description=description)
-
-    # Create new form
-    form = Form(
-        title=title,
-        description=description,
-        created_by=current_user_id
-    )
-
-    db.session.add(form)
-    db.session.commit()
+    if error:
+        flash(error, 'error')
+        return render_template('forms/create_form.html', title=data.get('title'), description=data.get('description'))
 
     # Redirect to form builder
     return redirect(url_for('forms.form_builder', form_id=form.id))

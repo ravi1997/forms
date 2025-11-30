@@ -20,21 +20,14 @@ def index():
         # User not logged in
         return render_template('main/index.html', published_forms=published_forms)
 
+from app.utils.decorators import login_required
+
+...
+
 @bp.route('/dashboard')
-def dashboard():
+@login_required
+def dashboard(current_user_id):
     """User dashboard"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash
-            flash('Please login to access the dashboard', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-    
     user = User.query.get_or_404(current_user_id)
     
     # Get user's forms
@@ -58,20 +51,9 @@ def dashboard():
                           recent_forms=recent_forms)
 
 @bp.route('/profile')
-def profile():
+@login_required
+def profile(current_user_id):
     """User profile page"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash
-            flash('Please login to access your profile', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-    
     user = User.query.get_or_404(current_user_id)
     
     return render_template('main/profile.html', user=user)

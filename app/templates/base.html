@@ -37,6 +37,9 @@
                     </div>
                 </div>
                 <div class="hidden sm:ml-6 sm:flex sm:items-center">
+                    <button id="dark-mode-toggle" class="text-white hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-moon"></i>
+                    </button>
                     {% if current_user %}
                     <div class="ml-3 relative">
                         <div class="flex items-center space-x-4">
@@ -52,9 +55,54 @@
                     </div>
                     {% endif %}
                 </div>
+                <div class="flex items-center sm:hidden">
+                    <button id="mobile-menu-button" class="text-white hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="mobile-menu" class="hidden sm:hidden">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="{{ url_for('main.index') }}" class="text-white hover:bg-blue-700 block px-3 py-2 rounded-md text-base font-medium">Home</a>
+                {% if current_user %}
+                <a href="{{ url_for('main.dashboard') }}" class="text-white hover:bg-blue-700 block px-3 py-2 rounded-md text-base font-medium">Dashboard</a>
+                <a href="{{ url_for('forms.list_templates') }}" class="text-white hover:bg-blue-700 block px-3 py-2 rounded-md text-base font-medium">Templates</a>
+                <a href="{{ url_for('analytics.dashboard') }}" class="text-white hover:bg-blue-700 block px-3 py-2 rounded-md text-base font-medium">Analytics</a>
+                <a href="{{ url_for('main.profile') }}" class="text-white hover:bg-blue-700 block px-3 py-2 rounded-md text-base font-medium">Profile</a>
+                <a href="{{ url_for('auth.logout') }}" class="text-white hover:bg-blue-700 block px-3 py-2 rounded-md text-base font-medium">Logout</a>
+                {% else %}
+                <a href="{{ url_for('auth.login') }}" class="text-white hover:bg-blue-700 block px-3 py-2 rounded-md text-base font-medium">Login</a>
+                <a href="{{ url_for('auth.register') }}" class="bg-white text-blue-600 hover:bg-gray-100 block px-3 py-2 rounded-md text-base font-medium">Register</a>
+                {% endif %}
             </div>
         </div>
     </nav>
+...
+<script>
+    const darkModeToggle = document.getElementById('dark-mode-toggle');
+    const html = document.querySelector('html');
+
+    darkModeToggle.addEventListener('click', () => {
+        html.classList.toggle('dark');
+        if (html.classList.contains('dark')) {
+            localStorage.setItem('darkMode', 'true');
+        } else {
+            localStorage.setItem('darkMode', 'false');
+        }
+    });
+
+    if (localStorage.getItem('darkMode') === 'true') {
+        html.classList.add('dark');
+    }
+
+    const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const mobileMenu = document.getElementById('mobile-menu');
+
+    mobileMenuButton.addEventListener('click', () => {
+        mobileMenu.classList.toggle('hidden');
+    });
+</script>
 
     <!-- Flash messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -79,6 +127,10 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div class="text-center">
                 <p class="text-gray-600">&copy; 2023 Dynamic Form Builder. All rights reserved.</p>
+                <div class="mt-4">
+                    <a href="/terms" class="text-gray-600 hover:text-gray-800 mx-2">Terms of Service</a>
+                    <a href="/privacy" class="text-gray-600 hover:text-gray-800 mx-2">Privacy Policy</a>
+                </div>
             </div>
         </div>
     </footer>

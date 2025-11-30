@@ -16,25 +16,23 @@ from reportlab.lib import colors
 
 response_schema = ResponseSchema()
 
-@bp.route('/<int:form_id>', methods=['GET'])
-def list_responses(form_id):
-    """List all responses for a form"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to access responses', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
+from app.utils.decorators import login_required, roles_required
 
+...
+
+from app.services.response_service import ResponseService
+
+...
+
+@bp.route('/<int:form_id>', methods=['GET'])
+@login_required
+def list_responses(form_id, current_user_id):
+    """List all responses for a form"""
     form = Form.query.get_or_404(form_id)
 
     # Check if user has permission to view responses
-    if form.created_by != current_user_id and not User.query.get(current_user_id).can_view_analytics():
+    user = User.query.get(current_user_id)
+    if form.created_by != current_user_id and not user.can_view_analytics():
         if request.is_json:
             return jsonify({'error': 'forbidden', 'message': 'You do not have permission to view responses'}), 403
         else:
@@ -46,29 +44,14 @@ def list_responses(form_id):
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 10, type=int), 100)
     
-    # Use eager loading to avoid N+1 queries
-    responses = Response.query.filter_by(form_id=form_id).options(
-        db.joinedload(Response.answers),
-        db.joinedload(Response.user)
-    ).paginate(page=page, per_page=per_page, error_out=False)
+    responses = ResponseService.get_responses_paginated(form_id, page, per_page)
     
     return render_template('responses/list.html', form=form, responses=responses)
 
 @bp.route('/<int:form_id>/export', methods=['GET'])
-def export_responses(form_id):
+@login_required
+def export_responses(form_id, current_user_id):
     """Export form responses in specified format"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to export responses', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
     form = Form.query.get_or_404(form_id)
 
     # Check if user has permission to export responses
@@ -98,230 +81,23 @@ def export_responses(form_id):
         })
 
     # For smaller datasets, process immediately
-    responses = Response.query.filter_by(form_id=form_id).all()
-    
-    # Get all questions in the form to create headers
-    all_sections = form.sections
-    questions = []
-    for section in all_sections:
-        questions.extend(section.questions)
-    
-    if format_type == 'csv':
-        # Create CSV
-        output = io.StringIO()
-        writer = csv.writer(output)
-        
-        # Create header row with question texts
-        headers = ['Response ID', 'Submitted At', 'User ID']
-        for question in questions:
-            headers.append(question.question_text)
-        writer.writerow(headers)
-        
-        # Add response data
-        for response in responses:
-            answers = {answer.question_id: answer for answer in response.answers}
-            row = [response.id, response.submitted_at, response.user_id or 'Anonymous']
-            
-            for question in questions:
-                answer = answers.get(question.id)
-                if answer:
-                    # Use answer_text if available, otherwise answer_value
-                    value = answer.answer_text or str(answer.answer_value) if answer.answer_value else ''
-                    row.append(value)
-                else:
-                    row.append('')
-            
-            writer.writerow(row)
-        
-        # Convert to bytes
-        output.seek(0)
-        csv_content = output.getvalue().encode('utf-8')
-        output.close()
-        
-        # Send CSV file
-        from flask import Response
-        return Response(
-            csv_content,
-            mimetype='text/csv',
-            headers={'Content-Disposition': f'attachment; filename=responses_{form_id}.csv'}
-        )
-    
-    elif format_type == 'json':
-        # Create JSON
-        responses_data = []
-        for response in responses:
-            response_data = {
-                'response_id': response.id,
-                'submitted_at': response.submitted_at.isoformat() if response.submitted_at else None,
-                'user_id': response.user_id,
-                'answers': []
-            }
-            
-            for answer in response.answers:
-                answer_data = {
-                    'question_id': answer.question_id,
-                    'question_text': answer.question.question_text,
-                    'answer_text': answer.answer_text,
-                    'answer_value': answer.answer_value
-                }
-                response_data['answers'].append(answer_data)
-            
-            responses_data.append(response_data)
-        
-        # Convert to JSON string
-        json_content = json.dumps(responses_data, indent=2, default=str)
-        
-        # Send JSON file
-        from flask import Response
-        return Response(
-            json_content,
-            mimetype='application/json',
-            headers={'Content-Disposition': f'attachment; filename=responses_{form_id}.json'}
-        )
-    
-    elif format_type == 'excel':
-        # Create Excel file using pandas
-        import pandas as pd
-        from io import BytesIO
-        
-        # Prepare data
-        data = []
-        for response in responses:
-            answers = {answer.question_id: answer for answer in response.answers}
-            row = {
-                'Response ID': response.id,
-                'Submitted At': response.submitted_at,
-                'User ID': response.user_id or 'Anonymous'
-            }
-            
-            for question in questions:
-                answer = answers.get(question.id)
-                if answer:
-                    # Use answer_text if available, otherwise answer_value
-                    value = answer.answer_text or str(answer.answer_value) if answer.answer_value else ''
-                    row[question.question_text] = value
-                else:
-                    row[question.question_text] = ''
-            
-            data.append(row)
-        
-        # Create DataFrame
-        df = pd.DataFrame(data)
-        
-        # Create Excel in memory
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='Responses')
-        
-        # Send Excel file
-        output.seek(0)
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f'responses_{form_id}.xlsx'
-        )
-    
-    elif format_type == 'pdf':
-        # Create PDF
-        from io import BytesIO
-        
-        # Prepare data for PDF
-        data = []
-        headers = ['Response ID', 'Submitted At', 'User ID']
-        
-        # Get all questions in the form to create headers
-        all_sections = form.sections
-        questions = []
-        for section in all_sections:
-            questions.extend(section.questions)
-        
-        # Add question titles as headers
-        for question in questions:
-            headers.append(question.question_text)
-        
-        data.append(headers)
-        
-        # Add response data
-        for response in responses:
-            answers = {answer.question_id: answer for answer in response.answers}
-            row = [str(response.id), response.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if response.submitted_at else 'N/A', 
-                   str(response.user_id or 'Anonymous')]
-            
-            for question in questions:
-                answer = answers.get(question.id)
-                if answer:
-                    # Use answer_text if available, otherwise answer_value
-                    value = answer.answer_text or str(answer.answer_value) if answer.answer_value else ''
-                    row.append(value)
-                else:
-                    row.append('')
-            
-            data.append(row)
-        
-        # Create PDF in memory
-        output = BytesIO()
-        doc = SimpleDocTemplate(output, pagesize=letter)
-        story = []
-        
-        # Title
-        styles = getSampleStyleSheet()
-        title = Paragraph(f"Form Responses - {form.title}", styles['Title'])
-        story.append(title)
-        story.append(Spacer(1, 12))
-        
-        # Add form information
-        form_info = Paragraph(f"Form ID: {form.id} | Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal'])
-        story.append(form_info)
-        story.append(Spacer(1, 12))
-        
-        # Create table
-        table = Table(data)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        
-        story.append(table)
-        story.append(PageBreak())
-        
-        # Build PDF
-        doc.build(story)
-        
-        # Return PDF file
-        output.seek(0)
-        return send_file(
-            output,
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name=f'responses_{form_id}.pdf'
-        )
-    
-    else:
+    data, mimetype = ResponseService.export_responses(form_id, format_type)
+
+    if data is None:
         return jsonify({'error': 'invalid_format', 'message': 'Invalid export format. Use csv, json, excel, or pdf'}), 400
 
-@bp.route('/<int:form_id>/analytics', methods=['GET'])
-@cache.cached(timeout=300, key_prefix=lambda: f"form_analytics_{request.args.get('form_id', '')}")
-def form_analytics(form_id):
-    """Display analytics for a form"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to access analytics', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
+    return send_file(
+        io.BytesIO(data) if isinstance(data, bytes) else io.StringIO(data),
+        mimetype=mimetype,
+        as_attachment=True,
+        download_name=f'responses_{form_id}.{format_type}'
+    )
 
+@bp.route('/<int:form_id>/analytics', methods=['GET'])
+@login_required
+@cache.cached(timeout=300, key_prefix=lambda: f"form_analytics_{request.args.get('form_id', '')}")
+def form_analytics(form_id, current_user_id):
+    """Display analytics for a form"""
     form = Form.query.get_or_404(form_id)
 
     # Check if user has permission to view analytics
@@ -434,20 +210,9 @@ def form_analytics(form_id):
                           time_analytics=time_analytics)
 
 @bp.route('/<int:response_id>/details', methods=['GET'])
-def response_details(response_id):
+@login_required
+def response_details(response_id, current_user_id):
     """Show details of a specific response"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to access response details', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
     response = Response.query.get_or_404(response_id)
 
     # Check if user has permission to view this response
@@ -473,20 +238,9 @@ def response_details(response_id):
                           form=form)
 
 @bp.route('/<int:form_id>/filter', methods=['GET'])
-def filter_responses(form_id):
+@login_required
+def filter_responses(form_id, current_user_id):
     """Filter responses based on criteria"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to filter responses', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
     form = Form.query.get_or_404(form_id)
 
     # Check if user has permission to view responses
@@ -530,20 +284,9 @@ def filter_responses(form_id):
     return render_template('responses/list.html', form=form, responses=responses, filtered=True)
 
 @bp.route('/<int:response_id>/delete', methods=['DELETE'])
-def delete_response(response_id):
+@login_required
+def delete_response(response_id, current_user_id):
     """Delete a specific response"""
-    # Try JWT first (API)
-    try:
-        current_user_id = get_jwt_identity()
-    except:
-        # Check session (web)
-        if 'user' not in session:
-            from flask import flash, redirect, url_for
-            flash('Please login to delete responses', 'error')
-            return redirect(url_for('auth.login'))
-        user_data = session['user']
-        current_user_id = user_data['id']
-
     response = Response.query.get_or_404(response_id)
     form = response.form
 

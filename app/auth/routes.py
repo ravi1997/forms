@@ -1,18 +1,11 @@
-from flask import request, jsonify, current_app, render_template, session
+from app.utils.helpers import get_request_data
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, get_jwt
-from app import db, limiter
-from app.auth import bp
-from app.models import User
-from app.schemas import LoginFormSchema, RegisterFormSchema, UserSchema
-from werkzeug.security import check_password_hash
-from datetime import datetime
-import re
 
-# Schema instances
-user_schema = UserSchema()
-users_schema = UserSchema(many=True)
-login_schema = LoginFormSchema()
-register_schema = RegisterFormSchema()
+...
+
+from app.services.user_service import UserService
+
+...
 
 @bp.route('/register', methods=['GET', 'POST'])
 @limiter.limit("500 per hour")
@@ -22,11 +15,7 @@ def register():
         return render_template('auth/register.html')
 
     try:
-        # Determine input type
-        if request.is_json:
-            data = request.json
-        else:
-            data = request.form.to_dict()
+        data = get_request_data()
 
         # Validate and deserialize input
         errors = register_schema.validate(data)
@@ -41,65 +30,15 @@ def register():
                     flash(f"{field}: {'; '.join(msgs)}", 'error')
                 return redirect(url_for('auth.register'))
 
-        # Extract data
-        username = data.get('username')
-        email = data.get('email')
-        password = data.get('password')
-        first_name = data.get('first_name', '')
-        last_name = data.get('last_name', '')
-        
-        # Check if user already exists
-        if User.query.filter_by(username=username).first():
-            return jsonify({'error': 'username_exists', 'message': 'Username already exists'}), 409
-        
-        if User.query.filter_by(email=email).first():
-            return jsonify({'error': 'email_exists', 'message': 'Email already registered'}), 409
-        
-        # Create new user
-        user = User(
-            username=username,
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
-            is_verified=False
-        )
-        user.set_password(password)
+        user, error = UserService.create_user(data)
 
-        # Generate email verification token
-        verification_token = user.generate_verification_token()
-
-        # Add to database
-        db.session.add(user)
-        db.session.commit()
-
-        # Send verification email
-        try:
-            from flask_mail import Message
-            from app import mail
-            from flask import current_app
-
-            verification_url = url_for('auth.verify_email', token=verification_token, _external=True)
-            msg = Message('Email Verification - Form Builder',
-                         sender=current_app.config['MAIL_DEFAULT_SENDER'],
-                         recipients=[user.email])
-            msg.body = f'''Hi {user.username},
-
-Thank you for registering with Form Builder!
-
-Please click the following link to verify your email address:
-{verification_url}
-
-This link will expire in 24 hours.
-
-If you didn't create an account, please ignore this email.
-
-Best regards,
-The Form Builder Team
-'''
-            mail.send(msg)
-        except Exception as e:
-            current_app.logger.error(f"Failed to send verification email: {str(e)}")
-            # Don't fail registration if email fails, but log it
+        if error:
+            if request.is_json:
+                return jsonify({'error': 'registration_failed', 'message': error}), 409
+            else:
+                from flask import flash, redirect, url_for
+                flash(error, 'error')
+                return redirect(url_for('auth.register'))
 
         # Return user data (without password)
         result = user_schema.dump(user)
@@ -123,11 +62,7 @@ def login():
         return render_template('auth/login.html')
 
     try:
-        # Determine input type
-        if request.is_json:
-            data = request.json
-        else:
-            data = request.form.to_dict()
+        data = get_request_data()
 
         # Validate input
         errors = login_schema.validate(data)
@@ -139,34 +74,16 @@ def login():
                 flash('Invalid username or password', 'error')
                 return redirect(url_for('auth.login'))
 
-        username = data.get('username')
-        password = data.get('password')
-        
-        # Find user
-        user = User.query.filter_by(username=username).first()
-        
-        if not user or not user.check_password(password):
+        user, error = UserService.authenticate_user(data)
+
+        if error:
             if request.is_json:
-                return jsonify({'error': 'invalid_credentials', 'message': 'Invalid username or password'}), 401
+                return jsonify({'error': 'login_failed', 'message': error}), 401
             else:
                 from flask import flash, redirect, url_for
-                flash('Invalid username or password', 'error')
+                flash(error, 'error')
                 return redirect(url_for('auth.login'))
 
-        if not user.is_active:
-            if request.is_json:
-                return jsonify({'error': 'account_disabled', 'message': 'Account is disabled'}), 401
-            else:
-                flash('Account is disabled', 'error')
-                return redirect(url_for('auth.login'))
-
-        if not user.is_verified:
-            if request.is_json:
-                return jsonify({'error': 'email_not_verified', 'message': 'Please verify your email before logging in'}), 401
-            else:
-                flash('Please verify your email before logging in', 'error')
-                return redirect(url_for('auth.login'))
-        
         # Create tokens
         access_token = create_access_token(identity=user.id)
         refresh_token = create_refresh_token(identity=user.id)
@@ -203,11 +120,10 @@ def logout():
     return redirect(url_for('main.index'))
 
 @bp.route('/profile', methods=['GET'])
-@jwt_required()
-def get_profile():
+@login_required
+def get_profile(current_user_id):
     """Get current user's profile information"""
     try:
-        current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
         
         if not user:
@@ -220,39 +136,16 @@ def get_profile():
         return jsonify({'error': 'profile_error', 'message': 'Could not retrieve profile'}), 500
 
 @bp.route('/profile', methods=['PUT'])
-@jwt_required()
-def update_profile():
+@login_required
+def update_profile(current_user_id):
     """Update current user's profile information"""
     try:
-        current_user_id = get_jwt_identity()
-        user = User.query.get(current_user_id)
-        
-        if not user:
-            return jsonify({'error': 'user_not_found', 'message': 'User not found'}), 404
-        
-        # Get update data
-        first_name = request.json.get('first_name')
-        last_name = request.json.get('last_name')
-        email = request.json.get('email')
-        preferences = request.json.get('preferences')
-        
-        # Update fields if provided
-        if first_name is not None:
-            user.first_name = first_name
-        if last_name is not None:
-            user.last_name = last_name
-        if email is not None:
-            # Check if email is already taken by another user
-            existing_user = User.query.filter_by(email=email).first()
-            if existing_user and existing_user.id != user.id:
-                return jsonify({'error': 'email_exists', 'message': 'Email already registered'}), 409
-            user.email = email
-        if preferences is not None:
-            user.preferences = preferences
-        
-        user.updated_at = datetime.utcnow()
-        db.session.commit()
-        
+        data = get_request_data()
+        user, error = UserService.update_user_profile(current_user_id, data)
+
+        if error:
+            return jsonify({'error': 'profile_update_failed', 'message': error}), 400
+
         return jsonify({'message': 'Profile updated successfully', 'data': user_schema.dump(user)}), 200
     
     except Exception as e:
@@ -275,11 +168,7 @@ def forgot_password():
         return render_template('auth/forgot_password.html')
 
     try:
-        # Determine input type
-        if request.is_json:
-            data = request.json
-        else:
-            data = request.form.to_dict()
+        data = get_request_data()
 
         email = data.get('email')
         if not email:
@@ -355,11 +244,7 @@ def reset_password(token):
         return render_template('auth/reset_password.html', token=token)
 
     try:
-        # Determine input type
-        if request.is_json:
-            data = request.json
-        else:
-            data = request.form.to_dict()
+        data = get_request_data()
 
         password = data.get('password')
         confirm_password = data.get('confirm_password')
@@ -430,11 +315,7 @@ def verify_email(token):
         return render_template('auth/verify_email.html', token=token)
 
     try:
-        # Determine input type
-        if request.is_json:
-            data = request.json
-        else:
-            data = request.form.to_dict()
+        data = get_request_data()
 
         token = data.get('token') or request.form.get('token')
 
