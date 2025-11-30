@@ -44,7 +44,7 @@
                     </div>
                     <div class="ml-4">
                         <dt class="text-sm font-medium text-gray-500 truncate">Completion Rate</dt>
-                        <dd class="text-2xl font-semibold text-gray-900">100%</dd>
+                        <dd class="text-2xl font-semibold text-gray-900">{{ "%.1f"|format(advanced_analytics.completion_rate) }}%</dd>
                     </div>
                 </div>
             </div>
@@ -58,7 +58,7 @@
                     </div>
                     <div class="ml-4">
                         <dt class="text-sm font-medium text-gray-500 truncate">Avg. Completion Time</dt>
-                        <dd class="text-2xl font-semibold text-gray-900">2m 30s</dd>
+                        <dd class="text-2xl font-semibold text-gray-900">{{ "%.1f"|format(advanced_analytics.average_completion_time) }}s</dd>
                     </div>
                 </div>
             </div>
@@ -71,6 +71,26 @@
             </div>
             <div class="p-6">
                 <canvas id="timelineChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Device and Browser Charts -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-lg">
+                <div class="px-6 py-4 border-b">
+                    <h2 class="text-lg font-medium text-gray-900">Devices</h2>
+                </div>
+                <div class="p-6">
+                    <canvas id="deviceChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg">
+                <div class="px-6 py-4 border-b">
+                    <h2 class="text-lg font-medium text-gray-900">Browsers</h2>
+                </div>
+                <div class="p-6">
+                    <canvas id="browserChart" width="400" height="200"></canvas>
+                </div>
             </div>
         </div>
 
@@ -157,6 +177,58 @@ new Chart(timelineCtx, {
                 beginAtZero: true
             }
         }
+    }
+});
+
+// Device Chart
+const deviceCtx = document.getElementById('deviceChart').getContext('2d');
+const deviceData = {{ advanced_analytics.device_data | tojson }};
+
+new Chart(deviceCtx, {
+    type: 'pie',
+    data: {
+        labels: Object.keys(deviceData),
+        datasets: [{
+            label: 'Devices',
+            data: Object.values(deviceData),
+            backgroundColor: [
+                'rgba(255, 99, 132, 0.8)',
+                'rgba(54, 162, 235, 0.8)',
+                'rgba(255, 206, 86, 0.8)',
+                'rgba(75, 192, 192, 0.8)',
+                'rgba(153, 102, 255, 0.8)',
+                'rgba(255, 159, 64, 0.8)'
+            ]
+        }]
+    },
+    options: {
+        responsive: true
+    }
+});
+
+// Browser Chart
+const browserCtx = document.getElementById('browserChart').getContext('2d');
+const browserData = {{ advanced_analytics.browser_data | tojson }};
+
+new Chart(browserCtx, {
+    type: 'pie',
+    data: {
+        labels: Object.keys(browserData),
+        datasets: [{
+            label: 'Browsers',
+            data: Object.values(browserData),
+            backgroundColor: [
+                'rgba(255, 99, 132, 0.8)',
+                'rgba(54, 162, 235, 0.8)',
+                'rgba(255, 206, 86, 0.8)',
+                'rgba(75, 192, 192, 0.8)',
+                'rgba(153, 102, 255, 0.8)',
+                'rgba(255, 159, 64, 0.8)'
+            ]
+        }]
+    },
+    options: {
+        responsive: true
     }
 });
 

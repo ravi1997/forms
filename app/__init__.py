@@ -1,3 +1,4 @@
+from flask_socketio import SocketIO
 from flask import Flask, request, g
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -18,6 +19,7 @@ import uuid
 from datetime import datetime
 
 # Initialize extensions
+socketio = SocketIO()
 db = SQLAlchemy()
 migrate = Migrate()
 ma = Marshmallow()
@@ -56,6 +58,7 @@ def create_app(config_name='default'):
     csrf.init_app(app)
     limiter.init_app(app)
     cache.init_app(app)
+    socketio.init_app(app, message_queue=app.config['REDIS_URL'])
 
     # Configure Celery
     celery.conf.update(
@@ -103,6 +106,15 @@ def create_app(config_name='default'):
 
     from app.analytics import bp as analytics_bp
     app.register_blueprint(analytics_bp, url_prefix='/analytics')
+
+    from app.webhooks import bp as webhooks_bp
+    app.register_blueprint(webhooks_bp, url_prefix='/webhooks')
+
+    from app.payments import bp as payments_bp
+    app.register_blueprint(payments_bp, url_prefix='/payments')
+
+    from app.sio import bp as sio_bp
+    app.register_blueprint(sio_bp, url_prefix='/socket.io')
 
     # Register error handlers
     from app.errors import bp as errors_bp
@@ -161,4 +173,4 @@ def configure_logging(app):
     app.logger.info("Application logging configured")
 
 from app import models, tasks
-from app.utils import analytics, cache
+from app.utils import analytics, caching

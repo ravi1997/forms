@@ -1,6 +1,6 @@
+from app.auth import bp
 from app.utils.helpers import get_request_data
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, get_jwt
-
 ...
 
 from app.services.user_service import UserService

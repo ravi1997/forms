@@ -132,6 +132,7 @@ class Form(db.Model):
     # Relationships
     sections = db.relationship('Section', backref='form', lazy=True, order_by='Section.order')
     responses = db.relationship('Response', backref='form', lazy=True)
+    webhooks = db.relationship('Webhook', backref='form', lazy=True, cascade="all, delete-orphan")
     analytics_cache = db.Column(db.JSON)  # Cached analytics data
     template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'))  # If form was created from a template
     
@@ -178,6 +179,7 @@ class Question(db.Model):
     order = db.Column(db.Integer, default=0)
     validation_rules = db.Column(db.JSON)  # Validation rules as JSON
     options = db.Column(db.JSON)  # For multiple choice, dropdown options
+    conditions = db.Column(db.JSON)  # Conditional logic rules
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -195,11 +197,13 @@ class Response(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), index=True)
     ip_address = db.Column(db.String(45))  # IPv4 or IPv6
     user_agent = db.Column(db.Text)  # Browser info
+    started_at = db.Column(db.DateTime, default=datetime.utcnow)
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     completed_at = db.Column(db.DateTime)  # When the response was fully submitted
     
     # Relationships
     answers = db.relationship('Answer', backref='response', lazy=True)
+    payment = db.relationship('Payment', backref='response', uselist=False, lazy=True)
     
     # Metadata
     meta = db.Column(db.JSON)  # Additional metadata about the response
@@ -257,6 +261,32 @@ class QuestionLibrary(db.Model):
     
     def __repr__(self):
         return f'<QuestionLibrary {self.question_text[:50]}>'
+
+class Webhook(db.Model):
+    __tablename__ = 'webhook'
+
+    id = db.Column(db.Integer, primary_key=True)
+    form_id = db.Column(db.Integer, db.ForeignKey('form.id'), nullable=False)
+    url = db.Column(db.String(255), nullable=False)
+    events = db.Column(db.JSON)  # e.g., ['response_created']
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<Webhook {self.url}>'
+
+class Payment(db.Model):
+    __tablename__ = 'payment'
+
+    id = db.Column(db.Integer, primary_key=True)
+    response_id = db.Column(db.Integer, db.ForeignKey('response.id'), nullable=False)
+    amount = db.Column(db.Integer, nullable=False)  # in cents
+    currency = db.Column(db.String(3), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='pending')
+    stripe_charge_id = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<Payment {self.id}>'
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_log'

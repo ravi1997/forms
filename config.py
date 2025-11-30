@@ -53,6 +53,11 @@ class Config:
     # Analytics
     ANALYTICS_RETENTION_DAYS = 365
 
+    # Stripe
+    STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY') or 'sk_test_... '
+    STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY') or 'pk_test_...'
+    STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET') or 'whsec_...'
+
     # Logging
     LOG_LEVEL = 'INFO'
     LOG_FILE_MAX_SIZE = 10 * 1024 * 1024  # 10MB

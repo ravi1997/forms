@@ -72,6 +72,44 @@
             </div>
           </div>
 
+          <div class="space-y-4 pt-4 border-t border-gray-200">
+            <div class="flex items-start">
+                <div class="flex items-center h-5">
+                    <input id="enable_payments" name="enable_payments" type="checkbox"
+                           {% if form.settings and form.settings.get('payment_amount') %}checked{% endif %}
+                           class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                </div>
+                <div class="ml-3 text-sm">
+                    <label for="enable_payments" class="font-medium text-gray-700">Enable Payments</label>
+                    <p class="text-gray-500">Collect payments with this form using Stripe.</p>
+                </div>
+            </div>
+            <div id="payment-settings" class="{% if not (form.settings and form.settings.get('payment_amount')) %}hidden{% endif %} space-y-4">
+                <div>
+                    <label for="payment_amount" class="block text-sm font-medium text-gray-700">
+                        Payment Amount
+                    </label>
+                    <div class="mt-1 relative rounded-md shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm">$</span>
+                        </div>
+                        <input type="number" id="payment_amount" name="payment_amount" min="0.01" step="0.01"
+                               value="{% if form.settings and form.settings.get('payment_amount') %}{{ "%.2f"|format(form.settings.get('payment_amount') / 100) }}{% endif %}"
+                               class="mt-1 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <div class="absolute inset-y-0 right-0 flex items-center">
+                            <label for="payment_currency" class="sr-only">Currency</label>
+                            <select id="payment_currency" name="payment_currency"
+                                    class="h-full py-0 pl-2 pr-7 border-transparent bg-transparent text-gray-500 sm:text-sm rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                <option {% if form.settings and form.settings.get('payment_currency') == 'usd' %}selected{% endif %}>USD</option>
+                                <option {% if form.settings and form.settings.get('payment_currency') == 'eur' %}selected{% endif %}>EUR</option>
+                                <option {% if form.settings and form.settings.get('payment_currency') == 'gbp' %}selected{% endif %}>GBP</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+          </div>
+
           <div class="flex items-center justify-between pt-4">
             <a href="{{ url_for('forms.edit_form', form_id=form.id) }}"
                class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
@@ -88,4 +126,21 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const enablePaymentsCheckbox = document.getElementById('enable_payments');
+    const paymentSettings = document.getElementById('payment-settings');
+
+    enablePaymentsCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            paymentSettings.classList.remove('hidden');
+        } else {
+            paymentSettings.classList.add('hidden');
+        }
+    });
+});
+</script>
 {% endblock %}

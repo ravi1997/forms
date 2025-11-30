@@ -202,12 +202,51 @@ def form_analytics(form_id, current_user_id):
                 time_analytics['responses_over_time'][date_str] += 1
             else:
                 time_analytics['responses_over_time'][date_str] = 1
-    
+
+    # Advanced Analytics
+    completion_rate = 0
+    average_completion_time = 0
+    if response_count > 0:
+        completed_responses = Response.query.filter(Response.form_id == form_id, Response.completed_at.isnot(None)).count()
+        completion_rate = (completed_responses / response_count) * 100
+
+        total_completion_time = 0
+        for response in responses:
+            if response.completed_at and response.started_at:
+                total_completion_time += (response.completed_at - response.started_at).total_seconds()
+        if completed_responses > 0:
+            average_completion_time = total_completion_time / completed_responses
+
+    device_data = {}
+    browser_data = {}
+    from werkzeug.user_agent import UserAgent
+    for response in responses:
+        if response.user_agent:
+            ua = UserAgent(response.user_agent)
+            if ua.platform:
+                if ua.platform in device_data:
+                    device_data[ua.platform] += 1
+                else:
+                    device_data[ua.platform] = 1
+            if ua.browser:
+                if ua.browser in browser_data:
+                    browser_data[ua.browser] += 1
+                else:
+                    browser_data[ua.browser] = 1
+
+    advanced_analytics = {
+        'completion_rate': completion_rate,
+        'average_completion_time': average_completion_time,
+        'device_data': device_data,
+        'browser_data': browser_data
+    }
+
     return render_template('responses/analytics.html', 
                           form=form, 
                           response_count=response_count,
                           analytics_data=analytics_data,
-                          time_analytics=time_analytics)
+                          time_analytics=time_analytics,
+                          advanced_analytics=advanced_analytics)
 
 @bp.route('/<int:response_id>/details', methods=['GET'])
 @login_required
