@@ -161,3 +161,4 @@ def configure_logging(app):
     app.logger.info("Application logging configured")
 
 from app import models, tasks
+from app.utils import analytics, cache

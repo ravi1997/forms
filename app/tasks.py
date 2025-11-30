@@ -2,6 +2,7 @@ from celery import current_task
 from datetime import datetime, timedelta
 from app import celery, db
 from app.models import Form, Response, Answer, AuditLog
+from app.utils.cache import invalidate_all_form_cache
 import logging
 
 @celery.task
@@ -87,13 +88,16 @@ def update_form_analytics(form_id):
         }
         
         db.session.commit()
-        
+
         # Update progress
         current_task.update_state(
             state='SUCCESS',
             meta={'status': 'Analytics updated successfully', 'response_count': response_count}
         )
-        
+
+        # Invalidate form analytics cache since it was updated by the background task
+        invalidate_all_form_cache(form_id)
+
         return {'status': 'success', 'response_count': response_count}
     
     except Exception as e:

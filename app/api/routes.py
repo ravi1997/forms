@@ -374,21 +374,21 @@ def unpublish_form(form_id):
     """Unpublish a form to stop accepting responses"""
     current_user_id = get_jwt_identity()
     form = Form.query.get(form_id)
-    
+
     if not form:
         return jsonify({'error': 'form_not_found', 'message': 'Form not found'}), 404
-    
+
     # Check if user has permission to unpublish this form
     if form.created_by != current_user_id:
         return jsonify({'error': 'forbidden', 'message': 'You do not have permission to unpublish this form'}), 403
-    
+
     if not form.is_published:
         return jsonify({'message': 'Form is already unpublished'}), 200
-    
+
     form.is_published = False
     form.updated_at = datetime.utcnow()
     db.session.commit()
-    
+
     # Create audit log
     create_audit_log(
         user_id=current_user_id,
@@ -399,7 +399,12 @@ def unpublish_form(form_id):
         ip_address=request.environ.get('REMOTE_ADDR'),
         user_agent=request.headers.get('User-Agent')
     )
-    
+
+    # Invalidate form analytics cache since form status changed
+    invalidate_all_form_cache(form_id)
+    # Also invalidate user dashboard cache
+    invalidate_user_dashboard_stats(current_user_id)
+
     return jsonify({'message': 'Form unpublished successfully', 'data': form_schema.dump(form)}), 200
 
 @bp.route('/forms/<int:form_id>/sections', methods=['GET'])
