@@ -14,7 +14,7 @@ from app.utils.analytics import (
     get_user_engagement_metrics,
     calculate_response_rate_trend
 )
-from app.utils.cache import (
+from app.utils.caching import (
     get_cached_form_analytics,
     cache_form_analytics,
     get_cached_dashboard_stats,

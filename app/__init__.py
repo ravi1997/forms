@@ -110,8 +110,8 @@ def create_app(config_name='default'):
     from app.webhooks import bp as webhooks_bp
     app.register_blueprint(webhooks_bp, url_prefix='/webhooks')
 
-    from app.payments import bp as payments_bp
-    app.register_blueprint(payments_bp, url_prefix='/payments')
+    # from app.payments import bp as payments_bp
+    # app.register_blueprint(payments_bp, url_prefix='/payments')  # Temporarily disabled until stripe is installed
 
     from app.sio import bp as sio_bp
     app.register_blueprint(sio_bp, url_prefix='/socket.io')

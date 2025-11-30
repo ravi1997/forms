@@ -2,7 +2,7 @@ from celery import current_task
 from datetime import datetime, timedelta
 from app import celery, db
 from app.models import Form, Response, Answer, AuditLog
-from app.utils.cache import invalidate_all_form_cache
+from app.utils.caching import invalidate_all_form_cache
 import logging
 
 @celery.task

@@ -12,7 +12,7 @@ from app.schemas import (
 )
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
-from app.utils.cache import (
+from app.utils.caching import (
     invalidate_form_analytics,
     invalidate_user_dashboard_stats,
     invalidate_all_form_cache

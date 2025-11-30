@@ -1,11 +1,20 @@
-from app.auth import bp
-from app.utils.helpers import get_request_data
+from flask import request, jsonify, current_app, render_template, session
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, get_jwt
-...
-
+from app import db, limiter
+from app.auth import bp
+from app.models import User
+from app.schemas import LoginFormSchema, RegisterFormSchema, UserSchema
+from app.utils.helpers import get_request_data
 from app.services.user_service import UserService
+from werkzeug.security import check_password_hash
+from datetime import datetime
+import re
 
-...
+# Schema instances
+user_schema = UserSchema()
+users_schema = UserSchema(many=True)
+login_schema = LoginFormSchema()
+register_schema = RegisterFormSchema()
 
 @bp.route('/register', methods=['GET', 'POST'])
 @limiter.limit("500 per hour")
@@ -120,26 +129,28 @@ def logout():
     return redirect(url_for('main.index'))
 
 @bp.route('/profile', methods=['GET'])
-@login_required
-def get_profile(current_user_id):
+@jwt_required()
+def get_profile():
     """Get current user's profile information"""
     try:
+        current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
-        
+
         if not user:
             return jsonify({'error': 'user_not_found', 'message': 'User not found'}), 404
-        
+
         return jsonify({'data': user_schema.dump(user)}), 200
-    
+
     except Exception as e:
         current_app.logger.error(f"Profile retrieval error: {str(e)}")
         return jsonify({'error': 'profile_error', 'message': 'Could not retrieve profile'}), 500
 
 @bp.route('/profile', methods=['PUT'])
-@login_required
-def update_profile(current_user_id):
+@jwt_required()
+def update_profile():
     """Update current user's profile information"""
     try:
+        current_user_id = get_jwt_identity()
         data = get_request_data()
         user, error = UserService.update_user_profile(current_user_id, data)
 
@@ -147,7 +158,7 @@ def update_profile(current_user_id):
             return jsonify({'error': 'profile_update_failed', 'message': error}), 400
 
         return jsonify({'message': 'Profile updated successfully', 'data': user_schema.dump(user)}), 200
-    
+
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Profile update error: {str(e)}")
