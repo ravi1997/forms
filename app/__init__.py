@@ -26,9 +26,9 @@ jwt = JWTManager()
 cors = CORS()
 mail = Mail()
 csrf = CSRFProtect()
-limiter = Limiter(key_func=get_remote_address, default_limits=["200 per day", "50 per hour"],storage_uri="redis://localhost:6379",
+limiter = Limiter(key_func=get_remote_address, default_limits=["2000 per day", "500 per hour"],storage_uri="redis://localhost:6379",
     storage_options={"socket_connect_timeout": 30},
-    strategy="fixed-window", # or "moving-window" or "sliding-window-counter"
+    strategy="fixed-window"
     )
 cache = Cache()
 

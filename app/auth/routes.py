@@ -15,7 +15,7 @@ login_schema = LoginFormSchema()
 register_schema = RegisterFormSchema()
 
 @bp.route('/register', methods=['GET', 'POST'])
-@limiter.limit("5 per hour")
+@limiter.limit("500 per hour")
 def register():
     """Register a new user account"""
     if request.method == 'GET':
@@ -116,7 +116,7 @@ The Form Builder Team
         return jsonify({'error': 'registration_failed', 'message': 'Registration failed'}), 500
 
 @bp.route('/login', methods=['GET', 'POST'])
-@limiter.limit("10 per minute")
+@limiter.limit("500 per minute")
 def login():
     """Authenticate user and return JWT tokens"""
     if request.method == 'GET':
