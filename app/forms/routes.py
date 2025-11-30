@@ -136,17 +136,8 @@ def submit_form(form_id):
                 )
                 db.session.add(answer)
     
-...
-    response.completed_at = datetime.utcnow()
     db.session.commit()
     
-    # Trigger webhooks
-    from app.services.webhook_service import WebhookService
-    from app.schemas import ResponseSchema
-    response_schema = ResponseSchema()
-    payload = response_schema.dump(response)
-    WebhookService.trigger_webhooks(form_id, 'response_created', payload)
-
     # Redirect to success page
     return redirect(url_for('forms.form_submitted', form_id=form_id))
 
@@ -382,20 +373,6 @@ def form_settings(form_id, current_user_id, form):
     settings['require_login'] = 'require_login' in request.form
     settings['collect_ip'] = 'collect_ip' in request.form
     settings['allow_multiple_responses'] = 'allow_multiple_responses' in request.form
-
-    if 'enable_payments' in request.form:
-        payment_amount = request.form.get('payment_amount')
-        if payment_amount:
-            try:
-                settings['payment_amount'] = int(float(payment_amount) * 100)
-            except ValueError:
-                pass
-        settings['payment_currency'] = request.form.get('payment_currency', 'usd')
-    else:
-        if 'payment_amount' in settings:
-            del settings['payment_amount']
-        if 'payment_currency' in settings:
-            del settings['payment_currency']
 
     form.settings = settings
     form.updated_at = datetime.utcnow()
