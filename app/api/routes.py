@@ -12,6 +12,11 @@ from app.schemas import (
 )
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
+from app.utils.cache import (
+    invalidate_form_analytics,
+    invalidate_user_dashboard_stats,
+    invalidate_all_form_cache
+)
 
 # Schema instances
 user_schema = UserSchema()
@@ -182,17 +187,17 @@ def create_form():
 
     if not user.can_create_forms():
         return jsonify({'error': 'forbidden', 'message': 'You do not have permission to create forms'}), 403
-    
+
     # Validate input
     errors = CreateFormSchema().validate(request.json)
     if errors:
         return jsonify({'error': 'validation_error', 'message': 'Invalid input data', 'details': errors}), 400
-    
+
     # Extract data
     title = request.json.get('title')
     description = request.json.get('description', '')
     settings = request.json.get('settings', {})
-    
+
     # Create form
     form = Form(
         title=title,
@@ -200,10 +205,10 @@ def create_form():
         settings=settings,
         created_by=current_user_id
     )
-    
+
     db.session.add(form)
     db.session.commit()
-    
+
     # Create audit log
     create_audit_log(
         user_id=user.id,
@@ -214,7 +219,10 @@ def create_form():
         ip_address=request.environ.get('REMOTE_ADDR'),
         user_agent=request.headers.get('User-Agent')
     )
-    
+
+    # Invalidate user dashboard cache since a new form was created
+    invalidate_user_dashboard_stats(current_user_id)
+
     return jsonify({'message': 'Form created successfully', 'data': form_schema.dump(form)}), 201
 
 @bp.route('/forms/<int:form_id>', methods=['GET'])
@@ -239,19 +247,19 @@ def update_form(form_id):
     """Update form information"""
     current_user_id = get_jwt_identity()
     form = Form.query.get(form_id)
-    
+
     if not form:
         return jsonify({'error': 'form_not_found', 'message': 'Form not found'}), 404
-    
+
     # Check if user has permission to update this form
     if form.created_by != current_user_id:
         return jsonify({'error': 'forbidden', 'message': 'You do not have permission to update this form'}), 403
-    
+
     # Validate input
     errors = UpdateFormSchema().validate(request.json)
     if errors:
         return jsonify({'error': 'validation_error', 'message': 'Invalid input data', 'details': errors}), 400
-    
+
     # Update fields if provided
     if 'title' in request.json:
         form.title = request.json['title']
@@ -263,10 +271,10 @@ def update_form(form_id):
         form.is_published = request.json['is_published']
         if form.is_published and not form.published_at:
             form.published_at = datetime.utcnow()
-    
+
     form.updated_at = datetime.utcnow()
     db.session.commit()
-    
+
     # Create audit log
     create_audit_log(
         user_id=current_user_id,
@@ -277,7 +285,12 @@ def update_form(form_id):
         ip_address=request.environ.get('REMOTE_ADDR'),
         user_agent=request.headers.get('User-Agent')
     )
-    
+
+    # Invalidate form analytics cache since form was updated
+    invalidate_all_form_cache(form_id)
+    # Also invalidate user dashboard cache
+    invalidate_user_dashboard_stats(current_user_id)
+
     return jsonify({'message': 'Form updated successfully', 'data': form_schema.dump(form)}), 200
 
 @bp.route('/forms/<int:form_id>', methods=['DELETE'])
@@ -286,17 +299,17 @@ def delete_form(form_id):
     """Delete a form"""
     current_user_id = get_jwt_identity()
     form = Form.query.get(form_id)
-    
+
     if not form:
         return jsonify({'error': 'form_not_found', 'message': 'Form not found'}), 404
-    
+
     # Check if user has permission to delete this form
     if form.created_by != current_user_id:
         return jsonify({'error': 'forbidden', 'message': 'You do not have permission to delete this form'}), 403
-    
+
     db.session.delete(form)
     db.session.commit()
-    
+
     # Create audit log
     create_audit_log(
         user_id=current_user_id,
@@ -307,7 +320,12 @@ def delete_form(form_id):
         ip_address=request.environ.get('REMOTE_ADDR'),
         user_agent=request.headers.get('User-Agent')
     )
-    
+
+    # Invalidate form analytics cache since form was deleted
+    invalidate_all_form_cache(form_id)
+    # Also invalidate user dashboard cache
+    invalidate_user_dashboard_stats(current_user_id)
+
     return jsonify({'message': 'Form deleted successfully'}), 204
 
 @bp.route('/forms/<int:form_id>/publish', methods=['POST'])
@@ -316,22 +334,22 @@ def publish_form(form_id):
     """Publish a form to make it available for responses"""
     current_user_id = get_jwt_identity()
     form = Form.query.get(form_id)
-    
+
     if not form:
         return jsonify({'error': 'form_not_found', 'message': 'Form not found'}), 404
-    
+
     # Check if user has permission to publish this form
     if form.created_by != current_user_id:
         return jsonify({'error': 'forbidden', 'message': 'You do not have permission to publish this form'}), 403
-    
+
     if form.is_published:
         return jsonify({'message': 'Form is already published'}), 200
-    
+
     form.is_published = True
     form.published_at = datetime.utcnow()
     form.updated_at = datetime.utcnow()
     db.session.commit()
-    
+
     # Create audit log
     create_audit_log(
         user_id=current_user_id,
@@ -342,7 +360,12 @@ def publish_form(form_id):
         ip_address=request.environ.get('REMOTE_ADDR'),
         user_agent=request.headers.get('User-Agent')
     )
-    
+
+    # Invalidate form analytics cache since form status changed
+    invalidate_all_form_cache(form_id)
+    # Also invalidate user dashboard cache
+    invalidate_user_dashboard_stats(current_user_id)
+
     return jsonify({'message': 'Form published successfully', 'data': form_schema.dump(form)}), 200
 
 @bp.route('/forms/<int:form_id>/unpublish', methods=['POST'])
@@ -404,24 +427,24 @@ def create_section(form_id):
     """Create a new section in a form"""
     current_user_id = get_jwt_identity()
     form = Form.query.get(form_id)
-    
+
     if not form:
         return jsonify({'error': 'form_not_found', 'message': 'Form not found'}), 404
-    
+
     # Check if user has permission to modify this form
     if form.created_by != current_user_id:
         return jsonify({'error': 'forbidden', 'message': 'You do not have permission to modify this form'}), 403
-    
+
     # Validate input
     errors = CreateSectionSchema().validate(request.json)
     if errors:
         return jsonify({'error': 'validation_error', 'message': 'Invalid input data', 'details': errors}), 400
-    
+
     # Extract data
     title = request.json.get('title', '')
     description = request.json.get('description', '')
     order = request.json.get('order', 0)
-    
+
     # Create section
     section = Section(
         title=title,
@@ -429,10 +452,10 @@ def create_section(form_id):
         form_id=form_id,
         order=order
     )
-    
+
     db.session.add(section)
     db.session.commit()
-    
+
     # Create audit log
     create_audit_log(
         user_id=current_user_id,
@@ -443,7 +466,10 @@ def create_section(form_id):
         ip_address=request.environ.get('REMOTE_ADDR'),
         user_agent=request.headers.get('User-Agent')
     )
-    
+
+    # Invalidate form analytics cache since form structure changed
+    invalidate_all_form_cache(form_id)
+
     return jsonify({'message': 'Section created successfully', 'data': section_schema.dump(section)}), 201
 
 @bp.route('/sections/<int:section_id>', methods=['PUT'])
@@ -452,19 +478,19 @@ def update_section(section_id):
     """Update a section"""
     current_user_id = get_jwt_identity()
     section = Section.query.get(section_id)
-    
+
     if not section:
         return jsonify({'error': 'section_not_found', 'message': 'Section not found'}), 404
-    
+
     # Check if user has permission to modify this section
     if section.form.created_by != current_user_id:
         return jsonify({'error': 'forbidden', 'message': 'You do not have permission to modify this section'}), 403
-    
+
     # Validate input
     errors = UpdateSectionSchema().validate(request.json)
     if errors:
         return jsonify({'error': 'validation_error', 'message': 'Invalid input data', 'details': errors}), 400
-    
+
     # Update fields if provided
     if 'title' in request.json:
         section.title = request.json['title']
@@ -472,10 +498,10 @@ def update_section(section_id):
         section.description = request.json['description']
     if 'order' in request.json:
         section.order = request.json['order']
-    
+
     section.updated_at = datetime.utcnow()
     db.session.commit()
-    
+
     # Create audit log
     create_audit_log(
         user_id=current_user_id,
@@ -486,8 +512,11 @@ def update_section(section_id):
         ip_address=request.environ.get('REMOTE_ADDR'),
         user_agent=request.headers.get('User-Agent')
     )
-    
-    return jsonify({'message': 'Section updated successfully', 'data': section_schema.dump(section)}), 20
+
+    # Invalidate form analytics cache since section was updated
+    invalidate_all_form_cache(section.form_id)
+
+    return jsonify({'message': 'Section updated successfully', 'data': section_schema.dump(section)}), 200
 
 @bp.route('/sections/<int:section_id>', methods=['DELETE'])
 @jwt_required()
@@ -495,17 +524,17 @@ def delete_section(section_id):
     """Delete a section (and all its questions)"""
     current_user_id = get_jwt_identity()
     section = Section.query.get(section_id)
-    
+
     if not section:
         return jsonify({'error': 'section_not_found', 'message': 'Section not found'}), 404
-    
+
     # Check if user has permission to delete this section
     if section.form.created_by != current_user_id:
         return jsonify({'error': 'forbidden', 'message': 'You do not have permission to delete this section'}), 403
-    
+
     db.session.delete(section)
     db.session.commit()
-    
+
     # Create audit log
     create_audit_log(
         user_id=current_user_id,
@@ -516,7 +545,10 @@ def delete_section(section_id):
         ip_address=request.environ.get('REMOTE_ADDR'),
         user_agent=request.headers.get('User-Agent')
     )
-    
+
+    # Invalidate form analytics cache since section was deleted
+    invalidate_all_form_cache(section.form_id)
+
     return jsonify({'message': 'Section deleted successfully'}), 204
 
 @bp.route('/sections/<int:section_id>/questions', methods=['GET'])
@@ -544,19 +576,19 @@ def create_question(section_id):
     """Create a new question in a section"""
     current_user_id = get_jwt_identity()
     section = Section.query.get(section_id)
-    
+
     if not section:
         return jsonify({'error': 'section_not_found', 'message': 'Section not found'}), 404
-    
+
     # Check if user has permission to modify this section
     if section.form.created_by != current_user_id:
         return jsonify({'error': 'forbidden', 'message': 'You do not have permission to modify this section'}), 403
-    
+
     # Validate input
     errors = CreateQuestionSchema().validate(request.json)
     if errors:
         return jsonify({'error': 'validation_error', 'message': 'Invalid input data', 'details': errors}), 400
-    
+
     # Extract data
     question_type = request.json.get('question_type')
     question_text = request.json.get('question_text')
@@ -564,7 +596,7 @@ def create_question(section_id):
     order = request.json.get('order', 0)
     validation_rules = request.json.get('validation_rules', {})
     options = request.json.get('options', [])
-    
+
     # Create question
     question = Question(
         section_id=section_id,
@@ -575,10 +607,10 @@ def create_question(section_id):
         validation_rules=validation_rules,
         options=options
     )
-    
+
     db.session.add(question)
     db.session.commit()
-    
+
     # Create audit log
     create_audit_log(
         user_id=current_user_id,
@@ -589,7 +621,10 @@ def create_question(section_id):
         ip_address=request.environ.get('REMOTE_ADDR'),
         user_agent=request.headers.get('User-Agent')
     )
-    
+
+    # Invalidate form analytics cache since question was added
+    invalidate_all_form_cache(section.form_id)
+
     return jsonify({'message': 'Question created successfully', 'data': question_schema.dump(question)}), 201
 
 @bp.route('/questions/<int:question_id>', methods=['PUT'])
@@ -598,19 +633,19 @@ def update_question(question_id):
     """Update a question"""
     current_user_id = get_jwt_identity()
     question = Question.query.get(question_id)
-    
+
     if not question:
         return jsonify({'error': 'question_not_found', 'message': 'Question not found'}), 404
-    
+
     # Check if user has permission to modify this question
     if question.section.form.created_by != current_user_id:
         return jsonify({'error': 'forbidden', 'message': 'You do not have permission to modify this question'}), 403
-    
+
     # Validate input
     errors = UpdateQuestionSchema().validate(request.json)
     if errors:
         return jsonify({'error': 'validation_error', 'message': 'Invalid input data', 'details': errors}), 400
-    
+
     # Update fields if provided
     if 'question_type' in request.json:
         question.question_type = request.json['question_type']
@@ -624,10 +659,10 @@ def update_question(question_id):
         question.validation_rules = request.json['validation_rules']
     if 'options' in request.json:
         question.options = request.json['options']
-    
+
     question.updated_at = datetime.utcnow()
     db.session.commit()
-    
+
     # Create audit log
     create_audit_log(
         user_id=current_user_id,
@@ -638,7 +673,10 @@ def update_question(question_id):
         ip_address=request.environ.get('REMOTE_ADDR'),
         user_agent=request.headers.get('User-Agent')
     )
-    
+
+    # Invalidate form analytics cache since question was updated
+    invalidate_all_form_cache(question.section.form_id)
+
     return jsonify({'message': 'Question updated successfully', 'data': question_schema.dump(question)}), 200
 
 @bp.route('/questions/<int:question_id>', methods=['DELETE'])
@@ -647,17 +685,17 @@ def delete_question(question_id):
     """Delete a question"""
     current_user_id = get_jwt_identity()
     question = Question.query.get(question_id)
-    
+
     if not question:
         return jsonify({'error': 'question_not_found', 'message': 'Question not found'}), 404
-    
+
     # Check if user has permission to delete this question
     if question.section.form.created_by != current_user_id:
         return jsonify({'error': 'forbidden', 'message': 'You do not have permission to delete this question'}), 403
-    
+
     db.session.delete(question)
     db.session.commit()
-    
+
     # Create audit log
     create_audit_log(
         user_id=current_user_id,
@@ -668,7 +706,10 @@ def delete_question(question_id):
         ip_address=request.environ.get('REMOTE_ADDR'),
         user_agent=request.headers.get('User-Agent')
     )
-    
+
+    # Invalidate form analytics cache since question was deleted
+    invalidate_all_form_cache(question.section.form_id)
+
     return jsonify({'message': 'Question deleted successfully'}), 204
 
 @bp.route('/forms/<int:form_id>/responses', methods=['POST'])
@@ -730,7 +771,7 @@ def submit_form_response(form_id):
         db.session.add(answer)
     
     db.session.commit()
-    
+
     # Create audit log
     create_audit_log(
         user_id=current_user_id or 0,  # Use 0 for anonymous responses
@@ -741,7 +782,14 @@ def submit_form_response(form_id):
         ip_address=request.environ.get('REMOTE_ADDR'),
         user_agent=request.headers.get('User-Agent')
     )
-    
+
+    # Invalidate form analytics cache since a new response was submitted
+    invalidate_all_form_cache(form_id)
+    # Also invalidate user dashboard cache for the form creator
+    form = Form.query.get(form_id)
+    if form:
+        invalidate_user_dashboard_stats(form.created_by)
+
     return jsonify({'message': 'Response submitted successfully', 'data': response_schema.dump(response)}), 201
 
 @bp.route('/forms/<int:form_id>/responses', methods=['GET'])
