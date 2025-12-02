@@ -3,8 +3,10 @@ from app import db
 from app.webhooks import bp
 from app.models import Form, Webhook
 from app.utils.decorators import login_required, form_owner_required
+from app.utils.helpers import log_route
 
 @bp.route('/<int:form_id>/webhooks', methods=['GET'])
+@log_route
 @login_required
 @form_owner_required
 def list_webhooks(form_id, current_user_id, form):
@@ -13,6 +15,7 @@ def list_webhooks(form_id, current_user_id, form):
     return render_template('webhooks/list.html', form=form, webhooks=webhooks)
 
 @bp.route('/<int:form_id>/webhooks/create', methods=['GET', 'POST'])
+@log_route
 @login_required
 @form_owner_required
 def create_webhook(form_id, current_user_id, form):
@@ -38,6 +41,7 @@ def create_webhook(form_id, current_user_id, form):
     return render_template('webhooks/create.html', form=form)
 
 @bp.route('/webhooks/<int:webhook_id>/delete', methods=['POST'])
+@log_route
 @login_required
 def delete_webhook(webhook_id, current_user_id):
     """Delete a webhook."""

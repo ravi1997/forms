@@ -3,8 +3,11 @@ from flask import request, jsonify, current_app, redirect, url_for
 from app import db
 from app.payments import bp
 from app.models import Form, Response, Payment
+from app.utils.helpers import log_route
 
+def create_checkout_session(form_id):
 @bp.route('/<int:form_id>/create-checkout-session', methods=['POST'])
+@log_route
 def create_checkout_session(form_id):
     """Create a new Stripe checkout session."""
     form = Form.query.get_or_404(form_id)
@@ -34,17 +37,23 @@ def create_checkout_session(form_id):
 
     return jsonify({'id': checkout_session.id})
 
+def success():
 @bp.route('/success')
+@log_route
 def success():
     """Handle successful payments."""
     return "Payment successful!"
 
+def cancel():
 @bp.route('/cancel')
+@log_route
 def cancel():
     """Handle canceled payments."""
     return "Payment canceled."
 
+def webhook():
 @bp.route('/webhook', methods=['POST'])
+@log_route
 def webhook():
     """Handle Stripe webhooks."""
     event = None

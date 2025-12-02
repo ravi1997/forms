@@ -24,8 +24,10 @@ from app.utils.caching import (
     invalidate_user_dashboard_stats,
     invalidate_form_analytics
 )
+from app.utils.helpers import log_route
 
 @bp.route('/', methods=['GET'])
+@log_route
 def dashboard():
     """Main analytics dashboard"""
     # Try JWT first (API)
@@ -122,6 +124,7 @@ def dashboard():
                           top_forms=top_forms)
 
 @bp.route('/form/<int:form_id>', methods=['GET'])
+@log_route
 def form_analytics_page(form_id):
     """Detailed analytics for a specific form"""
     # Try JWT first (API)
@@ -196,6 +199,7 @@ def form_analytics_page(form_id):
                           time_analytics=time_analytics)
 
 @bp.route('/user-engagement', methods=['GET'])
+@log_route
 def user_engagement():
     """User engagement analytics"""
     # Try JWT first (API)
@@ -253,6 +257,7 @@ def user_engagement():
                           form_popularity=form_popularity)
 
 @bp.route('/api/form/<int:form_id>/responses', methods=['GET'])
+@log_route
 @jwt_required()
 def api_form_responses(form_id):
     """API endpoint to get form responses data for dynamic charts"""
@@ -301,6 +306,7 @@ def api_form_responses(form_id):
     })
 
 @bp.route('/api/dashboard-stats', methods=['GET'])
+@log_route
 @jwt_required()
 def api_dashboard_stats():
     """API endpoint to get dashboard statistics"""

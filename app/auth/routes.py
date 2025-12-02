@@ -4,7 +4,7 @@ from app import db, limiter
 from app.auth import bp
 from app.models import User
 from app.schemas import LoginFormSchema, RegisterFormSchema, UserSchema
-from app.utils.helpers import get_request_data
+from app.utils.helpers import get_request_data, log_route
 from app.services.user_service import UserService
 from werkzeug.security import check_password_hash
 from datetime import datetime
@@ -18,6 +18,7 @@ register_schema = RegisterFormSchema()
 
 @bp.route('/register', methods=['GET', 'POST'])
 @limiter.limit("500 per hour")
+@log_route
 def register():
     """Register a new user account"""
     if request.method == 'GET':
@@ -65,6 +66,7 @@ def register():
 
 @bp.route('/login', methods=['GET', 'POST'])
 @limiter.limit("500 per minute")
+@log_route
 def login():
     """Authenticate user and return JWT tokens"""
     if request.method == 'GET':
@@ -120,6 +122,7 @@ def login():
         return jsonify({'error': 'login_failed', 'message': 'Login failed'}), 500
 
 @bp.route('/logout', methods=['GET', 'POST'])
+@log_route
 def logout():
     """Invalidate user session"""
     from flask import session, redirect, url_for, flash
@@ -129,6 +132,7 @@ def logout():
     return redirect(url_for('main.index'))
 
 @bp.route('/profile', methods=['GET'])
+@log_route
 @jwt_required()
 def get_profile():
     """Get current user's profile information"""
@@ -146,6 +150,7 @@ def get_profile():
         return jsonify({'error': 'profile_error', 'message': 'Could not retrieve profile'}), 500
 
 @bp.route('/profile', methods=['PUT'])
+@log_route
 @jwt_required()
 def update_profile():
     """Update current user's profile information"""
@@ -165,6 +170,7 @@ def update_profile():
         return jsonify({'error': 'profile_update_failed', 'message': 'Could not update profile'}), 500
 
 @bp.route('/refresh', methods=['POST'])
+@log_route
 @jwt_required(refresh=True)
 def refresh():
     """Refresh access token using refresh token"""
@@ -173,6 +179,7 @@ def refresh():
     return jsonify({'access_token': new_token}), 200
 
 @bp.route('/forgot-password', methods=['GET', 'POST'])
+@log_route
 def forgot_password():
     """Handle forgot password requests"""
     if request.method == 'GET':
@@ -243,6 +250,7 @@ The Form Builder Team
         return jsonify({'error': 'forgot_password_failed', 'message': 'Failed to process request'}), 500
 
 @bp.route('/reset-password/<token>', methods=['GET', 'POST'])
+@log_route
 def reset_password(token):
     """Handle password reset"""
     if request.method == 'GET':
@@ -314,6 +322,7 @@ def reset_password(token):
         return jsonify({'error': 'reset_failed', 'message': 'Failed to reset password'}), 500
 
 @bp.route('/verify-email/<token>', methods=['GET', 'POST'])
+@log_route
 def verify_email(token):
     """Handle email verification"""
     if request.method == 'GET':

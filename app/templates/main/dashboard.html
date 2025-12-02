@@ -4,129 +4,132 @@
 
 {% block content %}
 <div class="mb-8">
-    <h1 class="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-    <p class="text-gray-600">Welcome back, {{ current_user.get('username') }}! Here's an overview of your forms.</p>
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+            <p class="text-gray-600">Welcome back, {{ current_user.get('username') }}! Here's an overview of your forms.</p>
+        </div>
+        <div class="mt-4 md:mt-0">
+            <a href="{{ url_for('forms.create_form') }}"
+               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition duration-150 ease-in-out">
+                <i class="fas fa-plus mr-2"></i>
+                Create New Form
+            </a>
+        </div>
+    </div>
 </div>
 
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
-        <div class="flex items-center justify-between">
-            <div>
-                <h3 class="text-lg font-semibold">Total Forms</h3>
-                <p class="text-3xl font-bold">{{ total_forms }}</p>
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow duration-200">
+        <div class="flex items-center">
+            <div class="p-3 rounded-lg bg-blue-100 text-blue-600">
+                <i class="fas fa-file-alt text-xl"></i>
             </div>
-            <i class="fas fa-file-alt text-4xl opacity-75"></i>
+            <div class="ml-4">
+                <h3 class="text-sm font-medium text-gray-500">Total Forms</h3>
+                <p class="text-2xl font-semibold text-gray-900">{{ total_forms }}</p>
+            </div>
         </div>
     </div>
 
-    <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
-        <div class="flex items-center justify-between">
-            <div>
-                <h3 class="text-lg font-semibold">Published</h3>
-                <p class="text-3xl font-bold">{{ published_forms }}</p>
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow duration-200">
+        <div class="flex items-center">
+            <div class="p-3 rounded-lg bg-green-100 text-green-600">
+                <i class="fas fa-bullhorn text-xl"></i>
             </div>
-            <i class="fas fa-check-circle text-4xl opacity-75"></i>
+            <div class="ml-4">
+                <h3 class="text-sm font-medium text-gray-500">Published</h3>
+                <p class="text-2xl font-semibold text-gray-900">{{ published_forms }}</p>
+            </div>
         </div>
     </div>
 
-    <div class="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg shadow-lg p-6 text-white">
-        <div class="flex items-center justify-between">
-            <div>
-                <h3 class="text-lg font-semibold">Drafts</h3>
-                <p class="text-3xl font-bold">{{ draft_forms }}</p>
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow duration-200">
+        <div class="flex items-center">
+            <div class="p-3 rounded-lg bg-yellow-100 text-yellow-600">
+                <i class="fas fa-pause-circle text-xl"></i>
             </div>
-            <i class="fas fa-edit text-4xl opacity-75"></i>
+            <div class="ml-4">
+                <h3 class="text-sm font-medium text-gray-500">Drafts</h3>
+                <p class="text-2xl font-semibold text-gray-900">{{ draft_forms }}</p>
+            </div>
         </div>
     </div>
 
-    <div class="bg-gradient-to-r from-gray-500 to-gray-600 rounded-lg shadow-lg p-6 text-white">
-        <div class="flex items-center justify-between">
-            <div>
-                <h3 class="text-lg font-semibold">Archived</h3>
-                <p class="text-3xl font-bold">{{ archived_forms }}</p>
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow duration-200">
+        <div class="flex items-center">
+            <div class="p-3 rounded-lg bg-red-100 text-red-600">
+                <i class="fas fa-archive text-xl"></i>
             </div>
-            <i class="fas fa-archive text-4xl opacity-75"></i>
+            <div class="ml-4">
+                <h3 class="text-sm font-medium text-gray-500">Archived</h3>
+                <p class="text-2xl font-semibold text-gray-900">{{ archived_forms }}</p>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Main Content Grid -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    <!-- Recent Forms -->
-    <div class="lg:col-span-2">
-        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div class="px-6 py-4 bg-gray-50 border-b">
-                <h2 class="text-xl font-semibold text-gray-900">Recent Forms</h2>
+<!-- Recent Forms -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-6 py-5 border-b border-gray-200">
+        <h2 class="text-lg font-semibold text-gray-900">Recent Forms</h2>
+    </div>
+    <div class="p-6">
+        {% if recent_forms %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Form</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responses</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for form in recent_forms %}
+                        {% set response_count = form.responses|length %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">{{ form.title }}</div>
+                                <div class="text-sm text-gray-500">{{ form.description[:50] }}{% if form.description|length > 50 %}...{% endif %}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    {% if form.is_published %}bg-green-100 text-green-800{% elif form.is_archived %}bg-red-100 text-red-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                    {% if form.is_published %}Published{% elif form.is_archived %}Archived{% else %}Draft{% endif %}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ response_count }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ form.created_at.strftime('%b %d, %Y') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <a href="{{ url_for('forms.display_form', form_id=form.id) }}" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
+                                <a href="{{ url_for('analytics.form_analytics_page', form_id=form.id) }}" class="text-green-600 hover:text-green-900">Analytics</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            <div class="p-6">
-                {% if recent_forms %}
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            {% for form in recent_forms %}
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ form.title }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    {% if form.is_published %}
-                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Published</span>
-                                    {% elif form.is_archived %}
-                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Archived</span>
-                                    {% else %}
-                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Draft</span>
-                                    {% endif %}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ form.created_at.strftime('%Y-%m-%d') }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                                    <a href="{{ url_for('forms.form_builder', form_id=form.id) }}" class="text-blue-600 hover:text-blue-900">Edit</a>
-                                    <a href="{{ url_for('responses.list_responses', form_id=form.id) }}" class="text-gray-600 hover:text-gray-900">Responses</a>
-                                    <a href="{{ url_for('analytics.form_analytics_page', form_id=form.id) }}" class="text-purple-600 hover:text-purple-900">Analytics</a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-center py-12">
-                    <i class="fas fa-file-alt text-6xl text-gray-300 mb-4"></i>
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">No forms yet</h3>
-                    <p class="text-gray-500 mb-4">Get started by creating your first form from a template.</p>
-                    <a href="{{ url_for('forms.list_templates') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                        <i class="fas fa-plus mr-2"></i> Create New Form
+        {% else %}
+            <div class="text-center py-8">
+                <i class="fas fa-inbox text-5xl text-gray-300 mb-4"></i>
+                <h3 class="text-lg font-medium text-gray-900 mb-1">No forms yet</h3>
+                <p class="text-gray-500">Get started by creating your first form.</p>
+                <div class="mt-6">
+                    <a href="{{ url_for('forms.create_form') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                        <i class="fas fa-plus mr-2"></i>
+                        Create New Form
                     </a>
                 </div>
-                {% endif %}
             </div>
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div>
-        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div class="px-6 py-4 bg-gray-50 border-b">
-                <h2 class="text-xl font-semibold text-gray-900">Quick Actions</h2>
-            </div>
-            <div class="p-6 space-y-4">
-                <a href="{{ url_for('forms.list_templates') }}" class="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition duration-150 ease-in-out">
-                    <i class="fas fa-plus mr-2"></i> Create New Form
-                </a>
-                <a href="{{ url_for('analytics.dashboard') }}" class="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 transition duration-150 ease-in-out">
-                    <i class="fas fa-chart-bar mr-2"></i> View Analytics
-                </a>
-                <a href="{{ url_for('main.profile') }}" class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
-                    <i class="fas fa-user mr-2"></i> Manage Profile
-                </a>
-            </div>
-        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

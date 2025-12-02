@@ -17,6 +17,7 @@ from reportlab.lib import colors
 response_schema = ResponseSchema()
 
 from app.utils.decorators import login_required, roles_required
+from app.utils.helpers import log_route
 
 ...
 
@@ -25,6 +26,7 @@ from app.services.response_service import ResponseService
 ...
 
 @bp.route('/<int:form_id>', methods=['GET'])
+@log_route
 @login_required
 def list_responses(form_id, current_user_id):
     """List all responses for a form"""
@@ -49,6 +51,7 @@ def list_responses(form_id, current_user_id):
     return render_template('responses/list.html', form=form, responses=responses)
 
 @bp.route('/<int:form_id>/export', methods=['GET'])
+@log_route
 @login_required
 def export_responses(form_id, current_user_id):
     """Export form responses in specified format"""
@@ -94,6 +97,7 @@ def export_responses(form_id, current_user_id):
     )
 
 @bp.route('/<int:form_id>/analytics', methods=['GET'])
+@log_route
 @login_required
 @cache.cached(timeout=300, key_prefix=lambda: f"form_analytics_{request.args.get('form_id', '')}")
 def form_analytics(form_id, current_user_id):
@@ -249,6 +253,7 @@ def form_analytics(form_id, current_user_id):
                           advanced_analytics=advanced_analytics)
 
 @bp.route('/<int:response_id>/details', methods=['GET'])
+@log_route
 @login_required
 def response_details(response_id, current_user_id):
     """Show details of a specific response"""
@@ -277,6 +282,7 @@ def response_details(response_id, current_user_id):
                           form=form)
 
 @bp.route('/<int:form_id>/filter', methods=['GET'])
+@log_route
 @login_required
 def filter_responses(form_id, current_user_id):
     """Filter responses based on criteria"""

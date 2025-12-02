@@ -1,4 +1,4 @@
-from marshmallow import Schema, fields, post_load
+from marshmallow import Schema, fields, post_load, EXCLUDE
 from app import ma
 from app.models import User, Form, Section, Question, Response, Answer, FormTemplate, QuestionLibrary, AuditLog
 from app.models import UserRoles, QuestionTypes
@@ -77,10 +77,16 @@ class AuditLogSchema(ma.SQLAlchemyAutoSchema):
 
 # Request Schemas for validation
 class LoginFormSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+
     username = fields.Str(required=True, validate=lambda x: len(x) >= 3)
     password = fields.Str(required=True, validate=lambda x: len(x) >= 6)
 
 class RegisterFormSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+
     username = fields.Str(required=True, validate=lambda x: 3 <= len(x) <= 80)
     email = fields.Email(required=True)
     password = fields.Str(required=True, validate=lambda x: len(x) >= 8)

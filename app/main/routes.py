@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.main import bp
 from app.models import User, Form
+from app.utils.helpers import log_route
 
 @bp.route('/')
 def index():

@@ -4,8 +4,11 @@ from app import db
 from app.admin import bp
 from app.models import User, Form, Response, UserRoles
 from datetime import datetime
+from app.utils.helpers import log_route
 
+def admin_dashboard():
 @bp.route('/', methods=['GET'])
+@log_route
 def admin_dashboard():
     """Admin dashboard"""
     # Try JWT first (API)
@@ -39,7 +42,9 @@ def admin_dashboard():
                          total_responses=total_responses,
                          recent_users=recent_users)
 
+def manage_users():
 @bp.route('/users', methods=['GET'])
+@log_route
 def manage_users():
     """User management page"""
     # Try JWT first (API)
@@ -68,7 +73,9 @@ def manage_users():
 
     return render_template('admin/users.html', users=users)
 
+def edit_user(user_id):
 @bp.route('/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@log_route
 def edit_user(user_id):
     """Edit user details"""
     # Try JWT first (API)
@@ -111,7 +118,9 @@ def edit_user(user_id):
     flash('User updated successfully', 'success')
     return redirect(url_for('admin.edit_user', user_id=user_id))
 
+def delete_user(user_id):
 @bp.route('/users/<int:user_id>/delete', methods=['POST'])
+@log_route
 def delete_user(user_id):
     """Delete user"""
     # Try JWT first (API)

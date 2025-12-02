@@ -10,6 +10,7 @@ from app.schemas import (
     CreateQuestionSchema, UpdateQuestionSchema, SubmitResponseSchema,
     CreateTemplateSchema, CreateQuestionLibrarySchema
 )
+from app.utils.helpers import log_route
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from app.utils.caching import (
@@ -51,6 +52,7 @@ def create_audit_log(user_id, action, resource_type, resource_id, details=None, 
     db.session.commit()
 
 @bp.route('/users', methods=['GET'])
+@log_route
 @jwt_required()
 def get_users():
     """Get all users (admin only)"""
@@ -77,6 +79,7 @@ def get_users():
     }), 200
 
 @bp.route('/users/profile', methods=['GET'])
+@log_route
 @jwt_required()
 def get_current_user_profile():
     """Get current user's profile"""
@@ -89,6 +92,7 @@ def get_current_user_profile():
     return jsonify({'data': user_schema.dump(user)}), 200
 
 @bp.route('/users/profile', methods=['PUT'])
+@log_route
 @jwt_required()
 def update_current_user_profile():
     """Update current user's profile"""
@@ -135,6 +139,7 @@ def update_current_user_profile():
     return jsonify({'message': 'Profile updated successfully', 'data': user_schema.dump(user)}), 200
 
 @bp.route('/forms', methods=['GET'])
+@log_route
 @jwt_required()
 def get_forms():
     """Get all forms for the current user"""
@@ -174,6 +179,7 @@ def get_forms():
     }), 200
 
 @bp.route('/forms', methods=['POST'])
+@log_route
 @jwt_required()
 def create_form():
     """Create a new form"""
@@ -226,6 +232,7 @@ def create_form():
     return jsonify({'message': 'Form created successfully', 'data': form_schema.dump(form)}), 201
 
 @bp.route('/forms/<int:form_id>', methods=['GET'])
+@log_route
 @jwt_required()
 def get_form(form_id):
     """Get detailed information about a specific form"""
@@ -242,6 +249,7 @@ def get_form(form_id):
     return jsonify({'data': form_schema.dump(form)}), 200
 
 @bp.route('/forms/<int:form_id>', methods=['PUT'])
+@log_route
 @jwt_required()
 def update_form(form_id):
     """Update form information"""
@@ -294,6 +302,7 @@ def update_form(form_id):
     return jsonify({'message': 'Form updated successfully', 'data': form_schema.dump(form)}), 200
 
 @bp.route('/forms/<int:form_id>', methods=['DELETE'])
+@log_route
 @jwt_required()
 def delete_form(form_id):
     """Delete a form"""
@@ -329,6 +338,7 @@ def delete_form(form_id):
     return jsonify({'message': 'Form deleted successfully'}), 204
 
 @bp.route('/forms/<int:form_id>/publish', methods=['POST'])
+@log_route
 @jwt_required()
 def publish_form(form_id):
     """Publish a form to make it available for responses"""
@@ -369,6 +379,7 @@ def publish_form(form_id):
     return jsonify({'message': 'Form published successfully', 'data': form_schema.dump(form)}), 200
 
 @bp.route('/forms/<int:form_id>/unpublish', methods=['POST'])
+@log_route
 @jwt_required()
 def unpublish_form(form_id):
     """Unpublish a form to stop accepting responses"""
@@ -408,6 +419,7 @@ def unpublish_form(form_id):
     return jsonify({'message': 'Form unpublished successfully', 'data': form_schema.dump(form)}), 200
 
 @bp.route('/forms/<int:form_id>/sections', methods=['GET'])
+@log_route
 @jwt_required()
 def get_form_sections(form_id):
     """Get all sections of a form"""
@@ -427,6 +439,7 @@ def get_form_sections(form_id):
     return jsonify({'data': result}), 200
 
 @bp.route('/forms/<int:form_id>/sections', methods=['POST'])
+@log_route
 @jwt_required()
 def create_section(form_id):
     """Create a new section in a form"""
@@ -478,6 +491,7 @@ def create_section(form_id):
     return jsonify({'message': 'Section created successfully', 'data': section_schema.dump(section)}), 201
 
 @bp.route('/sections/<int:section_id>', methods=['PUT'])
+@log_route
 @jwt_required()
 def update_section(section_id):
     """Update a section"""
@@ -524,6 +538,7 @@ def update_section(section_id):
     return jsonify({'message': 'Section updated successfully', 'data': section_schema.dump(section)}), 200
 
 @bp.route('/sections/<int:section_id>', methods=['DELETE'])
+@log_route
 @jwt_required()
 def delete_section(section_id):
     """Delete a section (and all its questions)"""
@@ -557,6 +572,7 @@ def delete_section(section_id):
     return jsonify({'message': 'Section deleted successfully'}), 204
 
 @bp.route('/sections/<int:section_id>/questions', methods=['GET'])
+@log_route
 @jwt_required()
 def get_section_questions(section_id):
     """Get all questions in a section"""
@@ -576,6 +592,7 @@ def get_section_questions(section_id):
     return jsonify({'data': result}), 200
 
 @bp.route('/sections/<int:section_id>/questions', methods=['POST'])
+@log_route
 @jwt_required()
 def create_question(section_id):
     """Create a new question in a section"""
@@ -633,6 +650,7 @@ def create_question(section_id):
     return jsonify({'message': 'Question created successfully', 'data': question_schema.dump(question)}), 201
 
 @bp.route('/questions/<int:question_id>', methods=['PUT'])
+@log_route
 @jwt_required()
 def update_question(question_id):
     """Update a question"""
@@ -685,6 +703,7 @@ def update_question(question_id):
     return jsonify({'message': 'Question updated successfully', 'data': question_schema.dump(question)}), 200
 
 @bp.route('/questions/<int:question_id>', methods=['DELETE'])
+@log_route
 @jwt_required()
 def delete_question(question_id):
     """Delete a question"""
@@ -718,6 +737,7 @@ def delete_question(question_id):
     return jsonify({'message': 'Question deleted successfully'}), 204
 
 @bp.route('/forms/<int:form_id>/responses', methods=['POST'])
+@log_route
 @limiter.limit("10 per minute")
 def submit_form_response(form_id):
     """Submit a response to a form"""
@@ -798,6 +818,7 @@ def submit_form_response(form_id):
     return jsonify({'message': 'Response submitted successfully', 'data': response_schema.dump(response)}), 201
 
 @bp.route('/forms/<int:form_id>/responses', methods=['GET'])
+@log_route
 @jwt_required()
 def get_form_responses(form_id):
     """Get all responses for a form"""
@@ -828,6 +849,7 @@ def get_form_responses(form_id):
     }), 200
 
 @bp.route('/responses/<int:response_id>', methods=['GET'])
+@log_route
 @jwt_required()
 def get_response(response_id):
     """Get details of a specific response"""

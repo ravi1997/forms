@@ -6,6 +6,7 @@ from app.models import User, Form, Section, Question, Response, Answer, FormTemp
 from app.schemas import FormSchema, SectionSchema, QuestionSchema
 from app.utils.decorators import login_required, roles_required, form_owner_required
 from datetime import datetime
+from app.utils.helpers import log_route
 
 form_schema = FormSchema()
 section_schema = SectionSchema()
@@ -36,6 +37,7 @@ def _parse_question_payload():
     return question_text, question_type, cleaned_options, is_required, is_public
 
 @bp.route('/<int:form_id>', methods=['GET'])
+@log_route
 def display_form(form_id):
     """Display a form to be filled by respondents"""
     form = Form.query.get_or_404(form_id)
@@ -53,6 +55,7 @@ def display_form(form_id):
     return render_template('forms/display_form.html', form=form, sections=sections)
 
 @bp.route('/<int:form_id>/submit', methods=['POST'])
+@log_route
 def submit_form(form_id):
     """Handle form submission"""
     form = Form.query.get_or_404(form_id)
@@ -151,6 +154,7 @@ def submit_form(form_id):
     return redirect(url_for('forms.form_submitted', form_id=form_id))
 
 @bp.route('/<int:form_id>/submitted', methods=['GET'])
+@log_route
 def form_submitted(form_id):
     """Show form submission confirmation"""
     form = Form.query.get_or_404(form_id)
@@ -161,6 +165,7 @@ from app.utils.decorators import login_required, form_owner_required
 @bp.route('/<int:form_id>/builder', methods=['GET'])
 @login_required
 @form_owner_required
+@log_route
 def form_builder(form_id, current_user_id, form):
     """Display form builder interface"""
     # Get existing sections and questions
@@ -178,6 +183,7 @@ def form_builder(form_id, current_user_id, form):
 @bp.route('/<int:form_id>/update_structure', methods=['POST'])
 @login_required
 @form_owner_required
+@log_route
 def update_form_structure(form_id, current_user_id, form):
     """Update form structure (sections and questions)"""
     structure = request.json.get('structure', [])
@@ -195,6 +201,7 @@ def update_form_structure(form_id, current_user_id, form):
 
 @bp.route('/templates', methods=['GET'])
 @login_required
+@log_route
 def list_templates(current_user_id):
     """List available form templates"""
     # Get all public templates and templates created by this user
@@ -207,6 +214,7 @@ def list_templates(current_user_id):
 @bp.route('/create_from_template/<int:template_id>', methods=['GET'])
 @login_required
 @roles_required(['admin', 'creator'])
+@log_route
 def create_from_template(template_id, current_user_id):
     """Create a new form from a template"""
     form, error = FormService.create_form_from_template(template_id, current_user_id)
@@ -225,6 +233,7 @@ def create_from_template(template_id, current_user_id):
 @bp.route('/<int:form_id>/edit', methods=['GET', 'POST'])
 @login_required
 @form_owner_required
+@log_route
 def edit_form(form_id, current_user_id, form):
     """Edit form metadata"""
     if request.method == 'GET':
@@ -254,6 +263,7 @@ def edit_form(form_id, current_user_id, form):
 @bp.route('/<int:form_id>/delete', methods=['POST'])
 @login_required
 @form_owner_required
+@log_route
 def delete_form(form_id, current_user_id, form):
     """Delete a form"""
     try:
@@ -279,6 +289,7 @@ def delete_form(form_id, current_user_id, form):
 @bp.route('/<int:form_id>/publish', methods=['POST'])
 @login_required
 @form_owner_required
+@log_route
 def publish_form(form_id, current_user_id, form):
     """Publish a form so it becomes publicly accessible."""
     form.is_published = True
@@ -297,6 +308,7 @@ def publish_form(form_id, current_user_id, form):
 @bp.route('/<int:form_id>/unpublish', methods=['POST'])
 @login_required
 @form_owner_required
+@log_route
 def unpublish_form(form_id, current_user_id, form):
     """Mark a form as draft so it is no longer public."""
     form.is_published = False
@@ -313,6 +325,7 @@ def unpublish_form(form_id, current_user_id, form):
 @bp.route('/<int:form_id>/archive', methods=['POST'])
 @login_required
 @form_owner_required
+@log_route
 def archive_form(form_id, current_user_id, form):
     """Archive a form to remove it from the active list."""
     form.is_archived = True
@@ -330,6 +343,7 @@ def archive_form(form_id, current_user_id, form):
 @bp.route('/<int:form_id>/restore', methods=['POST'])
 @login_required
 @form_owner_required
+@log_route
 def restore_form(form_id, current_user_id, form):
     """Restore an archived form."""
     form.is_archived = False
@@ -345,6 +359,7 @@ def restore_form(form_id, current_user_id, form):
 
 @bp.route('/my-forms', methods=['GET'])
 @login_required
+@log_route
 def my_forms(current_user_id):
     """List user's forms"""
     # Get user's forms, ordered by creation date (newest first)
@@ -355,6 +370,7 @@ def my_forms(current_user_id):
 @bp.route('/<int:form_id>/settings', methods=['GET', 'POST'])
 @login_required
 @form_owner_required
+@log_route
 def form_settings(form_id, current_user_id, form):
     """Manage form settings"""
     if request.method == 'GET':
