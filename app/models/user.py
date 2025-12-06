@@ -3,9 +3,10 @@ from typing import Dict, List, Optional, Any
 import uuid
 from flask import current_app
 from app.extensions import db, bcrypt
+from enum import Enum
 
 
-class StatusEnum(db.Enum):
+class StatusEnum(Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     SUSPENDED = "suspended"
@@ -13,7 +14,9 @@ class StatusEnum(db.Enum):
 
 
 class User(db.Model):
-    id = db.Column(db.UUID(as_uuid=True), primary_key=True)
+    __tablename__ = 'user'
+    
+    id = db.Column(db.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
     first_name = db.Column(db.String(100), nullable=False)
     middle_name = db.Column(db.String(100), nullable=True)
@@ -24,7 +27,7 @@ class User(db.Model):
     designation = db.Column(db.String(100), nullable=True)
     department = db.Column(db.String(100), nullable=True)
     
-    status = db.Column(StatusEnum, default=StatusEnum.INACTIVE, nullable=False)
+    status = db.Column(db.Enum(StatusEnum), default=StatusEnum.INACTIVE, nullable=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
     
     updated_by = db.Column(db.String(100), nullable=True)
@@ -461,7 +464,9 @@ class AccountRoles(db.Model):
     role_id = db.Column(db.UUID(as_uuid=True), db.ForeignKey('role.id'), primary_key=True)
 
 class Account(db.Model):
-    id = db.Column(db.UUID(as_uuid=True), primary_key=True)
+    __tablename__ = 'account'
+    
+    id = db.Column(db.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
     user_id = db.Column(db.UUID(as_uuid=True), db.ForeignKey('user.id'), nullable=False)
     user = db.relationship('User', backref=db.backref('accounts', lazy=True))
@@ -474,8 +479,8 @@ class Account(db.Model):
     password_reset_token_expires_at = db.Column(db.DateTime, nullable=True)
     
     created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
-
-    updated_by = db.Column(db.String(100), nullable=True)    
+    
+    updated_by = db.Column(db.String(100), nullable=True)
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now(), nullable=False)
     
     deleted_by = db.Column(db.String(100), nullable=True)
@@ -483,10 +488,10 @@ class Account(db.Model):
     
     otp = db.Column(db.String(10), nullable=True)
     otp_created_at = db.Column(db.DateTime, nullable=True)
-
+    
     roles = db.relationship('Role', secondary='account_roles', backref=db.backref('accounts', lazy='dynamic'))
     
-    status = db.Column(StatusEnum, default=StatusEnum.INACTIVE, nullable=False)
+    status = db.Column(db.Enum(StatusEnum), default=StatusEnum.INACTIVE, nullable=False)
     
     
     def set_password(self, password):
