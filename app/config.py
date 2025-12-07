@@ -10,7 +10,6 @@ class Config:
     
     # Database configuration
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_RECORD_QUERIES = True
     
     # Mail server configuration (for password reset emails, etc.)
     MAIL_SERVER = os.environ.get('MAIL_SERVER')
@@ -59,8 +58,6 @@ class DevelopmentConfig(Config):
         'sqlite:///dev_app.db'
     
     # Additional development settings
-    SQLALCHEMY_ECHO = True  # Log SQL queries
-    
     # Allow HTTP for development
     SESSION_COOKIE_SECURE = False
     
