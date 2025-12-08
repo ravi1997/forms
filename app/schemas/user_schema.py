@@ -45,7 +45,7 @@ class UserSchema(Schema):
     first_name = fields.Str(required=True)
     middle_name = fields.Str(allow_none=True)
     last_name = fields.Str(allow_none=True)
-    dob = fields.Date(required=True)
+    dob = fields.Raw(required=True)  # Using Raw to allow both date objects and strings
     designation = fields.Str(allow_none=True)
     department = fields.Str(allow_none=True)
     status = StatusEnumField(required=True)
@@ -85,7 +85,15 @@ class UserSchema(Schema):
 
     @validates('dob')
     def validate_dob(self, value):
-        if value and value > db.func.current_date():
+        # Convert string dates to date objects for comparison
+        if value and isinstance(value, str):
+            from datetime import datetime
+            try:
+                value = datetime.fromisoformat(value).date()
+            except ValueError:
+                # If it's not a valid date string, let the validation fail naturally
+                pass
+        if value and value > datetime.now().date():
             raise ValidationError('Date of birth cannot be in the future')
         # Additional validation for age can be added if needed
 
@@ -132,7 +140,15 @@ class UserCreateSchema(Schema):
 
     @validates('dob')
     def validate_dob(self, value):
-        if value and value > db.func.current_date():
+        # Convert string dates to date objects for comparison
+        if value and isinstance(value, str):
+            from datetime import datetime
+            try:
+                value = datetime.fromisoformat(value).date()
+            except ValueError:
+                # If it's not a valid date string, let the validation fail naturally
+                pass
+        if value and value > datetime.now().date():
             raise ValidationError('Date of birth cannot be in the future')
 
 
@@ -178,7 +194,15 @@ class UserUpdateSchema(Schema):
 
     @validates('dob')
     def validate_dob(self, value):
-        if value and value > db.func.current_date():
+        # Convert string dates to date objects for comparison
+        if value and isinstance(value, str):
+            from datetime import datetime
+            try:
+                value = datetime.fromisoformat(value).date()
+            except ValueError:
+                # If it's not a valid date string, let the validation fail naturally
+                pass
+        if value and value > datetime.now().date():
             raise ValidationError('Date of birth cannot be in the future')
 
 
@@ -188,7 +212,7 @@ class UserPublicSchema(Schema):
     first_name = fields.Str(required=True)
     middle_name = fields.Str(allow_none=True)
     last_name = fields.Str(allow_none=True)
-    dob = fields.Date(required=True)
+    dob = fields.Raw(required=True)  # Using Raw to allow both date objects and strings
     designation = fields.Str(allow_none=True)
     department = fields.Str(allow_none=True)
     status = StatusEnumField(required=True)
@@ -225,5 +249,13 @@ class UserPublicSchema(Schema):
 
     @validates('dob')
     def validate_dob(self, value):
-        if value and value > db.func.current_date():
+        # Convert string dates to date objects for comparison
+        if value and isinstance(value, str):
+            from datetime import datetime
+            try:
+                value = datetime.fromisoformat(value).date()
+            except ValueError:
+                # If it's not a valid date string, let the validation fail naturally
+                pass
+        if value and value > datetime.now().date():
             raise ValidationError('Date of birth cannot be in the future')
