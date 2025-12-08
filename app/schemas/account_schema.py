@@ -108,7 +108,7 @@ class AccountCreateSchema(Schema):
     deleted_at = fields.DateTime(allow_none=True)
     otp = fields.Str(allow_none=True)
     otp_created_at = fields.DateTime(allow_none=True)
-    status = StatusEnumField(missing=StatusEnum.INACTIVE)  # Default to INACTIVE for new accounts
+    status = StatusEnumField(load_default=StatusEnum.INACTIVE)  # Default to INACTIVE for new accounts
 
     @validates('username')
     def validate_username(self, value):

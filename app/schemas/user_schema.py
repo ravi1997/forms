@@ -98,7 +98,7 @@ class UserCreateSchema(Schema):
     dob = fields.Date(required=True)
     designation = fields.Str(allow_none=True)
     department = fields.Str(allow_none=True)
-    status = StatusEnumField(missing=StatusEnum.INACTIVE)  # Default to INACTIVE for new users
+    status = StatusEnumField(load_default=StatusEnum.INACTIVE)  # Default to INACTIVE for new users
     updated_by = fields.Str(allow_none=True)
     deleted_by = fields.Str(allow_none=True)
     deleted_at = fields.DateTime(allow_none=True)
